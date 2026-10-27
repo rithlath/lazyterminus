@@ -1,0 +1,66 @@
+{
+    "commits": {
+        "acme-web": [
+            {"datetime": "2026-10-26T15:12:04", "author": "Developer B", "labels": "dev", "hash": "a1c9e0f2b3d4c5e6f708192a3b4c5d6e7f809a1b", "message": "PROJ-77: Add hero banner block to homepage"},
+            {"datetime": "2026-10-25T13:40:51", "author": "Developer A", "labels": "dev", "hash": "b2d0f1a3c4e5d6f7a8091a2b3c4d5e6f7a8b9c0d", "message": "PROJ-76: Update news listing view config"},
+            {"datetime": "2026-10-24T10:05:33", "author": "Developer B", "labels": "dev, test", "hash": "c3e1a2b4d5f6e7a8b9c0d1e2f3a4b5c6d7e8f901", "message": "PROJ-75: Bump drupal/core to 11.4.10"},
+            {"datetime": "2026-10-23T09:01:02", "author": "Developer C", "labels": "feedback", "hash": "d4f2b3c5e6a7f8b9c0d1e2f3a4b5c6d7e8f90123", "message": "Feedback: add contact feedback webform"}
+        ]
+    },
+    "env_overrides": {
+        "acme-web": {
+            "feedback": {"connection_mode": "sftp"}
+        }
+    },
+    "diffstat": {
+        "acme-web.feedback": [
+            {"file": "web/modules/custom/rta_cx/rta_cx.module", "status": "M", "deletions": 3, "additions": 41},
+            {"file": "config/sync/webform.webform.contact_feedback.yml", "status": "A", "deletions": 0, "additions": 212}
+        ]
+    },
+    "workflows": {
+        "acme-web": [
+            {"id": "4cc4d582-0000-11f1-97ff-ba7034571581", "env": "test", "workflow": "Deploy code to \"test\"", "user": "user1@example.com", "status": "failed", "started_at": 1793080000.5, "finished_at": 1793080089.2, "time": "89s"}
+        ]
+    },
+    "workflow_ops": {
+        "4cc4d582-0000-11f1-97ff-ba7034571581": "workflow_ops_failed_deploy.json",
+        "4cc4d582-442d-11f1-97ff-ba7034571581": "workflow_ops_failed_deploy.json"
+    },
+    "asleep": ["acme-web.proj-19", "acme-portal.dev"],
+    "upstream": {
+        "acme-intranet": [
+            {"hash": "e5a3c4d6f7b8a9c0d1e2f3a4b5c6d7e8f9012345", "datetime": "2026-10-20T14:00:00", "message": "Update to Drupal 11.4.10.", "author": "Pantheon Automation"}
+        ]
+    },
+    "plugin_commands": [
+        {
+            "name": "build:env:list",
+            "description": "List the environments created by Build Tools (plugin).",
+            "usage": ["build:env:list [--format FORMAT] [--] <site_name>"],
+            "help": "List the environments created by Build Tools (plugin).",
+            "definition": {
+                "arguments": {
+                    "site_name": {"name": "site_name", "is_required": true, "is_array": false, "description": "Site name", "default": null}
+                },
+                "options": {
+                    "format": {"name": "--format", "shortcut": "", "accept_value": true, "is_value_required": true, "is_multiple": false, "description": "Format the result data.", "default": "table"}
+                }
+            }
+        },
+        {
+            "name": "build:env:delete:pr",
+            "description": "Delete all multidevs for closed pull requests (plugin).",
+            "usage": ["build:env:delete:pr [--dry-run] [--yes] [--] <site_name>"],
+            "help": "Delete all multidevs for closed pull requests (plugin).",
+            "definition": {
+                "arguments": {
+                    "site_name": {"name": "site_name", "is_required": true, "is_array": false, "description": "Site name", "default": null}
+                },
+                "options": {
+                    "dry-run": {"name": "--dry-run", "shortcut": "", "accept_value": false, "is_value_required": false, "is_multiple": false, "description": "Only print what would be deleted", "default": false}
+                }
+            }
+        }
+    ]
+}

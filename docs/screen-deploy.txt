@@ -1,0 +1,32 @@
+╭─ [1] Sites ──────────────────────────────────╮╭─ [3] acme-web.test ──────────────────────────────────────────────────╮
+│   acme-intranet  drupal   8 envs             ││ Domain        test-acme-web.pantheonsite.io                          │
+│   acme-portal    drupal   3 envs             ││ Connection    git                                                    │
+│ › acme-web       drupal   12 envs            ││ PHP           8.4                                                    │
+│   sandbox-12     drupal   3 envs             ││ Drupal        unknown (no local repo mapped)                         │
+╰───────────────────────────────────── 3 of 4 ─╯│ Protection    protected (typed confirmation)                         │
+╭─ [2] Environments · acme-web ────────────────╮│ Commits       ↑2 ready to deploy from dev                            │
+│   ● dev      ╭─ Deploy dev → test · acme-web ─────────────────────────────────────────────────────────╮              │
+│ › ✗ test     │ Deploying promotes ALL 2 commit(s) from dev to test.                                   │              │
+│   ● live     │ Pantheon has no per-commit deploys. Quicksilver hooks run after deploy (drush cim).    │              │
+│ ── multidevs │                                                                                        │state         │
+│   ● annual   │   a1c9e0f PROJ-77: Add hero banner block to homepage — Developer B                     │              │
+│   ● contact-u│   b2d0f1a PROJ-76: Update news listing view config — Developer A                       │              │
+│   ● d11      │                                                                                        │Developer B   │
+│   ● feedback │ › Deploy note * what is going out and why                                              │veloper A     │
+│   ● newslette│   Clear cache   [x] --cc                                                               │──────────────╯
+│   ● proj-19  │   Update DB     [x] --updatedb (runs update.php)                                       │──────────────╮
+│   ● proj-29  │   Sync content  [ ] --sync-content (clone database and files from live into test       │ dev · 1h ago │
+│   ● proj-40  │ first)                                                                                 │live · 1h ago │
+│   ● schedules│                                                                                        │test · 7h ago │
+│              │ … deploy note is required                                                              │test · 9h ago │
+│              ╰───────────────────── enter submit · tab next · space toggle · ←/→ choose · esc cancel ─╯ter · 19h ago │
+│                                              ││   ✓ Sync Advanced Edge configuration (if any) … newsletter · 19h ago │
+│                                              ││   ✓ Create a Multidev environment                     site · 19h ago │
+│                                              ││   ✓ Automated backup for the "dev" environment          dev · 1d ago │
+│                                              ││   ✓ Automated backup for the "live" environment        live · 1d ago │
+│                                              ││   ✓ Automated backup for the "test" environment        test · 1d ago │
+│                                              ││   ✓ Automated backup for the "dev" environment          dev · 2d ago │
+│                                              ││   ✓ Automated backup for the "live" environment        live · 2d ago │
+╰──────────────────────────────────── 12 envs ─╯╰──────────────────────────────────────────────────────────────────────╯
+ lazyterminus   MOCK  2 commit(s) ready to deploy to acme-web.test                                        acme-web.test
+d deploy  c cache  b backup  l clone  m mode  w wake  x drush  o commit  n new md  D del md  u upstream  : palette  g l…

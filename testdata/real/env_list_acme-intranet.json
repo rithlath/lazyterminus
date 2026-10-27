@@ -1,0 +1,66 @@
+{
+    "live": {
+        "id": "live",
+        "created": 1768231185,
+        "domain": "live-acme-intranet.pantheonsite.io",
+        "connection_mode": "git",
+        "locked": false,
+        "initialized": true
+    },
+    "events": {
+        "id": "events",
+        "created": 1792439588,
+        "domain": "events-acme-intranet.pantheonsite.io",
+        "connection_mode": "git",
+        "locked": false,
+        "initialized": true
+    },
+    "awards": {
+        "id": "awards",
+        "created": 1791571440,
+        "domain": "awards-acme-intranet.pantheonsite.io",
+        "connection_mode": "git",
+        "locked": false,
+        "initialized": true
+    },
+    "views-http": {
+        "id": "views-http",
+        "created": 1789065610,
+        "domain": "views-http-acme-intranet.pantheonsite.io",
+        "connection_mode": "git",
+        "locked": false,
+        "initialized": true
+    },
+    "media-comp": {
+        "id": "media-comp",
+        "created": 1791569558,
+        "domain": "media-comp-acme-intranet.pantheonsite.io",
+        "connection_mode": "git",
+        "locked": false,
+        "initialized": true
+    },
+    "test": {
+        "id": "test",
+        "created": 1768231184,
+        "domain": "test-acme-intranet.pantheonsite.io",
+        "connection_mode": "git",
+        "locked": false,
+        "initialized": true
+    },
+    "dev": {
+        "id": "dev",
+        "created": 1768231181,
+        "domain": "dev-acme-intranet.pantheonsite.io",
+        "connection_mode": "git",
+        "locked": false,
+        "initialized": true
+    },
+    "holiday": {
+        "id": "holiday",
+        "created": 1792439760,
+        "domain": "holiday-acme-intranet.pantheonsite.io",
+        "connection_mode": "git",
+        "locked": false,
+        "initialized": true
+    }
+}

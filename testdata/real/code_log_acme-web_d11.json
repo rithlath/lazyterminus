@@ -1,0 +1,107 @@
+[
+    {
+        "datetime": "2026-08-25T12:58:57",
+        "author": "Developer A",
+        "labels": "d11",
+        "hash": "04e5609f99c1034d52e522570cd4489c9257bcbd",
+        "message": "Merge 08f79c46f60c3da37aa6c8affcad8ad6be92e4fb int"
+    },
+    {
+        "datetime": "2026-08-25T12:58:13",
+        "author": "Developer C",
+        "labels": "d11",
+        "hash": "e968bc0fb76f48c4f43dfd5dbd466b60b9f91e4d",
+        "message": "PROJ-00: Sync config from Live"
+    },
+    {
+        "datetime": "2026-08-14T14:54:23",
+        "author": "Developer D",
+        "labels": "d11",
+        "hash": "9de24750f1f8642c127cd18c5ce7986e0f74ae58",
+        "message": "Disable smooth scrolling on webform"
+    },
+    {
+        "datetime": "2026-08-14T14:55:53",
+        "author": "Developer D",
+        "labels": "d11",
+        "hash": "845284011517a2827f3de5b8fd0dab053d628655",
+        "message": "Survey config sync"
+    },
+    {
+        "datetime": "2026-08-12T19:36:11",
+        "author": "Developer A",
+        "labels": "d11",
+        "hash": "0edb1737c702c87fa8c144e50ccd9a1ae207f675",
+        "message": "Merge pull request #26 from vendor/proj-67  PR"
+    },
+    {
+        "datetime": "2026-08-12T19:09:29",
+        "author": "Developer A",
+        "labels": "d11",
+        "hash": "40f795f409dfb43d537e08598908052623669bba",
+        "message": "Merge pull request #25 from vendor/proj-67  PR"
+    },
+    {
+        "datetime": "2026-08-11T14:30:01",
+        "author": "Developer C",
+        "labels": "d11",
+        "hash": "b8c21c8ffa8ac7bcd2382b047888fef04bd9fd78",
+        "message": "PROJ-58: Uninstall deprecated modules layout_bui"
+    },
+    {
+        "datetime": "2026-08-10T18:18:53",
+        "author": "Developer C",
+        "labels": "d11",
+        "hash": "214de02c93306e6c518acc75b7a459d9b2bdc8ed",
+        "message": "PROJ-58: Adjust Embedded Content button settings"
+    },
+    {
+        "datetime": "2026-08-10T17:42:06",
+        "author": "Developer A",
+        "labels": "d11",
+        "hash": "ff3b0736e1382dc3cbef370b6c546f4ffbc22155",
+        "message": "Merge pull request #23 from vendor/proj-58  PR"
+    },
+    {
+        "datetime": "2026-08-04T18:16:06",
+        "author": "Developer B",
+        "labels": "d11",
+        "hash": "a4607438c5f79ba85b48ce61b829ae8c05a5a712",
+        "message": "Merge pull request #22 from vendor/survey  Su"
+    },
+    {
+        "datetime": "2026-08-04T13:48:28",
+        "author": "Developer B",
+        "labels": "d11",
+        "hash": "7ed4059c134bb6a43eb097080b8d3da3f8a29f0b",
+        "message": "Merge pull request #21 from vendor/survey  Su"
+    },
+    {
+        "datetime": "2026-08-04T13:31:42",
+        "author": "Developer B",
+        "labels": "d11",
+        "hash": "22eecca8e465823370fd8b303c5648d70bd6c932",
+        "message": "Merge pull request #20 from vendor/podcast  Podc"
+    },
+    {
+        "datetime": "2026-07-31T14:00:46",
+        "author": "Developer B",
+        "labels": "d11",
+        "hash": "c68474a498ea39119f99dba146df8195c4d90627",
+        "message": "Merge pull request #19 from vendor/podcast  Podc"
+    },
+    {
+        "datetime": "2026-07-29T12:58:11",
+        "author": "Developer B",
+        "labels": "d11",
+        "hash": "f8af1bb04f9e82a94e693fefd42d71522ff0e556",
+        "message": "Merge pull request #18 from vendor/banner  Homep"
+    },
+    {
+        "datetime": "2026-07-23T16:07:38",
+        "author": "Developer D",
+        "labels": "d11",
+        "hash": "c3d2494a8794c5ece2b01a99c98383663d4ababc",
+        "message": "Webform config sync  Adds usage survey form an"
+    }
+]

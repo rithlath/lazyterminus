@@ -1,0 +1,46 @@
+{
+    "079eba6f-f51d-cd48-3819-ecbf64860875": {
+        "name": "sandbox-12",
+        "id": "079eba6f-f51d-cd48-3819-ecbf64860875",
+        "plan_name": "Sandbox",
+        "framework": "drupal8",
+        "region": "United States",
+        "owner": "e92c6324-07d1-17f2-ed46-eaac9f30b6b9",
+        "created": 1776703230,
+        "memberships": "e92c6324-07d1-17f2-ed46-eaac9f30b6b9: Team,adc47f7c-a0b6-1512-7dda-15354d9b736d: personal-workspace",
+        "frozen": false
+    },
+    "e45307a4-ab73-256b-a2e5-c1e1a2816d0a": {
+        "name": "acme-web",
+        "id": "e45307a4-ab73-256b-a2e5-c1e1a2816d0a",
+        "plan_name": "Elite",
+        "framework": "drupal8",
+        "region": "United States",
+        "owner": "6c23f37c-226d-16f4-6fd7-39c3b5c3d216",
+        "created": 1768230644,
+        "memberships": "4d3054c2-4962-9c85-fce8-d68ae98a1cb5: example-org",
+        "frozen": false
+    },
+    "d8db70e3-782f-03cd-14a5-f82830097b21": {
+        "name": "acme-portal",
+        "id": "d8db70e3-782f-03cd-14a5-f82830097b21",
+        "plan_name": "Basic",
+        "framework": "drupal8",
+        "region": "United States",
+        "owner": "6c23f37c-226d-16f4-6fd7-39c3b5c3d216",
+        "created": 1768231659,
+        "memberships": "4d3054c2-4962-9c85-fce8-d68ae98a1cb5: example-org",
+        "frozen": false
+    },
+    "1e67314f-f02f-b329-9ca6-cc666fbd6f59": {
+        "name": "acme-intranet",
+        "id": "1e67314f-f02f-b329-9ca6-cc666fbd6f59",
+        "plan_name": "Performance Medium",
+        "framework": "drupal8",
+        "region": "United States",
+        "owner": "6c23f37c-226d-16f4-6fd7-39c3b5c3d216",
+        "created": 1768231179,
+        "memberships": "4d3054c2-4962-9c85-fce8-d68ae98a1cb5: example-org",
+        "frozen": false
+    }
+}

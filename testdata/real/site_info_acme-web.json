@@ -1,0 +1,18 @@
+{
+    "id": "e45307a4-ab73-256b-a2e5-c1e1a2816d0a",
+    "name": "acme-web",
+    "label": "Acme Web",
+    "created": 1768230644,
+    "framework": "drupal8",
+    "region": "United States",
+    "organization": "4d3054c2-4962-9c85-fce8-d68ae98a1cb5",
+    "plan_name": "Elite",
+    "max_num_cdes": 10,
+    "upstream": "d9c53a4e-f5fd-af78-de55-445841950b1a: https://github.com/pantheon-upstreams/drupal-composer-managed.git",
+    "upstream_label": "Drupal (Composer Managed)",
+    "holder_type": "organization",
+    "holder_id": "4d3054c2-4962-9c85-fce8-d68ae98a1cb5",
+    "owner": "6c23f37c-226d-16f4-6fd7-39c3b5c3d216",
+    "frozen": false,
+    "last_frozen_at": null
+}

@@ -1,0 +1,32 @@
+╭─ [1] Sites ──────────────────────────────────╮╭─ [3] acme-web.test ──────────────────────────────────────────────────╮
+│   acme-intranet  drupal   8 envs             ││ Domain        test-acme-web.pantheonsite.io                          │
+│   acme-portal    drupal   3 envs             ││ Connection    git                                                    │
+│ › acme-web       drupal   12 envs            ││ PHP           8.4                                                    │
+│   sandbox-12     drupal   3 envs             ││ Drupal        unknown (no local repo mapped)                         │
+╰───────────────────────────────────── 3 of 4 ─╯│ Protection    protected (typed confirmation)                         │
+╭─ [2] Environments · acme-web ────────────────╮│ Commits       ↑2 ready to deploy from dev                            │
+│   ● dev         git                          ││ Last deploy   ✗ 7h ago by user1@example.com                          │
+│ › ✗ test        git ↑2 failed                ││                                                                      │
+│   ● live        git ↑1                       ││ ✗ Failed 7h ago: Deploy code to "test"                               │
+│ ── multidevs ─────────────────────────────── ││   Bring application container to desired configuration state         │
+│   ● annual      git                          ││                                                                      │
+│   ● contact-us  git                          ││ Commits ready to deploy from dev:                                    │
+│   ● d11         git ↑11                      ││   a1c9e0f PROJ-77: Add hero banner block to homepage — Developer B   │
+│   ● feedback    sftp ↑1 ✎2 uncommitted       ││   b2d0f1a PROJ-76: Update news listing view config — Developer A     │
+│   ● newsletter  git                          │╰──────────────────────────────────────────────────────────────────────╯
+│   ● proj-19     git                          │╭─ [4] Workflows ──────────────────────────────────────────────────────╮
+│   ● proj-29     git                          ││   ✓ Automated backup for the "dev" environment          dev · 1h ago │
+│   ● proj-40     git                          ││   ✓ Automated backup for the "live" environment        live · 1h ago │
+│   ● schedules   git                          ││   ✗ Deploy code to "test"                              test · 7h ago │
+│                                              ││   ✓ Automated backup for the "test" environment        test · 9h ago │
+│                                              ││   ✓ Converge resources based on updated proper… newsletter · 19h ago │
+│                                              ││   ✓ Sync Advanced Edge configuration (if any) … newsletter · 19h ago │
+│                                              ││   ✓ Create a Multidev environment                     site · 19h ago │
+│                                              ││   ✓ Automated backup for the "dev" environment          dev · 1d ago │
+│                                              ││   ✓ Automated backup for the "live" environment        live · 1d ago │
+│                                              ││   ✓ Automated backup for the "test" environment        test · 1d ago │
+│                                              ││   ✓ Automated backup for the "dev" environment          dev · 2d ago │
+│                                              ││   ✓ Automated backup for the "live" environment        live · 2d ago │
+╰──────────────────────────────────── 12 envs ─╯╰──────────────────────────────────────────────────────────────────────╯
+ lazyterminus   MOCK  4 sites                                                                             acme-web.test
+d deploy  c cache  b backup  l clone  m mode  w wake  x drush  o commit  n new md  D del md  u upstream  : palette  g l…

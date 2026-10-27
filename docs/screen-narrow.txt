@@ -1,0 +1,30 @@
+╭─ [1] Sites ──────────────────────────────────────────────────────────────────╮
+│   acme-intranet  drupal   8 envs                                             │
+│   acme-portal    drupal   3 envs                                             │
+│ › acme-web       drupal   12 envs                                            │
+│   sandbox-12     drupal   3 envs                                             │
+╰───────────────────────────────────────────────────────────────────── 3 of 4 ─╯
+╭─ [2] Environments · acme-web ────────────────────────────────────────────────╮
+│   ● dev         git                                                          │
+│ › ✗ test        git ↑2 failed                                                │
+│   ● live        git ↑1                                                       │
+│ ── multidevs ─────────────────────────────────────────────────────────────── │
+│   ● annual      git                                                          │
+│   ● contact-us  git                                                          │
+│   ● d11         git ↑11                                                      │
+│   ● feedback    sftp ↑1 ✎2 uncommitted                                       │
+╰──────────────────────────────────────────────────────────────────── 12 envs ─╯
+╭─ [3] acme-web.test ──────────────────────────────────────────────────────────╮
+│ Domain        test-acme-web.pantheonsite.io                                  │
+│ Connection    git                                                            │
+│ PHP           8.4                                                            │
+│ Drupal        unknown (no local repo mapped)                                 │
+╰─────────────────────────────────────────────────────────────────────── 1/11 ─╯
+╭─ [4] Workflows ──────────────────────────────────────────────────────────────╮
+│   ✓ Automated backup for the "dev" environment                  dev · 1h ago │
+│   ✓ Automated backup for the "live" environment                live · 1h ago │
+│   ✗ Deploy code to "test"                                      test · 7h ago │
+│   ✓ Automated backup for the "test" environment                test · 9h ago │
+╰──────────────────────────────────────────────────────────────────────────────╯
+ lazyterminus   MOCK  Cancelled.                                  acme-web.test
+d deploy  c cache  b backup  l clone  m mode  w wake  x drush  o commit  n new …

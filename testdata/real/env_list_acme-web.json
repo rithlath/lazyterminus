@@ -1,0 +1,122 @@
+{
+    "test": {
+        "id": "test",
+        "created": 1768230650,
+        "domain": "test-acme-web.pantheonsite.io",
+        "connection_mode": "git",
+        "locked": false,
+        "initialized": true,
+        "php_version": "8.4",
+        "php_runtime_generation": 2
+    },
+    "proj-40": {
+        "id": "proj-40",
+        "created": 1771354636,
+        "domain": "proj-40-acme-web.pantheonsite.io",
+        "connection_mode": "git",
+        "locked": false,
+        "initialized": true,
+        "php_version": "8.3",
+        "php_runtime_generation": 2
+    },
+    "proj-19": {
+        "id": "proj-19",
+        "created": 1770933869,
+        "domain": "proj-19-acme-web.pantheonsite.io",
+        "connection_mode": "git",
+        "locked": false,
+        "initialized": true,
+        "php_version": "8.3",
+        "php_runtime_generation": 2
+    },
+    "live": {
+        "id": "live",
+        "created": 1768230651,
+        "domain": "live-acme-web.pantheonsite.io",
+        "connection_mode": "git",
+        "locked": false,
+        "initialized": true,
+        "php_version": "8.4",
+        "php_runtime_generation": 2
+    },
+    "dev": {
+        "id": "dev",
+        "created": 1768230646,
+        "domain": "dev-acme-web.pantheonsite.io",
+        "connection_mode": "git",
+        "locked": false,
+        "initialized": true,
+        "php_version": "8.4",
+        "php_runtime_generation": 2
+    },
+    "d11": {
+        "id": "d11",
+        "created": 1784812213,
+        "domain": "d11-acme-web.pantheonsite.io",
+        "connection_mode": "git",
+        "locked": false,
+        "initialized": true,
+        "php_version": "8.4",
+        "php_runtime_generation": 2
+    },
+    "annual": {
+        "id": "annual",
+        "created": 1791574286,
+        "domain": "annual-acme-web.pantheonsite.io",
+        "connection_mode": "git",
+        "locked": false,
+        "initialized": true,
+        "php_version": "8.4",
+        "php_runtime_generation": 2
+    },
+    "contact-us": {
+        "id": "contact-us",
+        "created": 1792417438,
+        "domain": "contact-us-acme-web.pantheonsite.io",
+        "connection_mode": "git",
+        "locked": false,
+        "initialized": true,
+        "php_version": "8.4",
+        "php_runtime_generation": 2
+    },
+    "feedback": {
+        "id": "feedback",
+        "created": 1790082295,
+        "domain": "feedback-acme-web.pantheonsite.io",
+        "connection_mode": "git",
+        "locked": false,
+        "initialized": true,
+        "php_version": "8.4",
+        "php_runtime_generation": 2
+    },
+    "proj-29": {
+        "id": "proj-29",
+        "created": 1771529298,
+        "domain": "proj-29-acme-web.pantheonsite.io",
+        "connection_mode": "git",
+        "locked": false,
+        "initialized": true,
+        "php_version": "8.3",
+        "php_runtime_generation": 2
+    },
+    "schedules": {
+        "id": "schedules",
+        "created": 1790692586,
+        "domain": "schedules-acme-web.pantheonsite.io",
+        "connection_mode": "git",
+        "locked": false,
+        "initialized": true,
+        "php_version": "8.4",
+        "php_runtime_generation": 2
+    },
+    "newsletter": {
+        "id": "newsletter",
+        "created": 1793034105,
+        "domain": "newsletter-acme-web.pantheonsite.io",
+        "connection_mode": "git",
+        "locked": false,
+        "initialized": true,
+        "php_version": "8.4",
+        "php_runtime_generation": 2
+    }
+}

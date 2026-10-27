@@ -1,0 +1,11 @@
+{
+    "id": "dev",
+    "created": 1768230646,
+    "domain": "dev-acme-web.pantheonsite.io",
+    "locked": false,
+    "initialized": true,
+    "connection_mode": "git",
+    "php_version": "8.4",
+    "drush_version": 10,
+    "php_runtime_generation": 2
+}

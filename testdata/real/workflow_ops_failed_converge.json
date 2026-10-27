@@ -1,0 +1,14 @@
+{
+    "c4fb8b10-c7f2-11f1-ba1c-02bf97f77c1f": {
+        "type": "platform",
+        "result": "succeeded",
+        "duration": "0s",
+        "description": ""
+    },
+    "c5018f10-c7f2-11f1-ba1c-02bf97f77c1f": {
+        "type": "platform",
+        "result": "failed",
+        "duration": "29s",
+        "description": ""
+    }
+}

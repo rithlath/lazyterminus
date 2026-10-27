@@ -1,0 +1,26 @@
+{
+    "test": {
+        "id": "test",
+        "created": 1776703238,
+        "domain": "test-sandbox-12.pantheonsite.io",
+        "connection_mode": "git",
+        "locked": false,
+        "initialized": true
+    },
+    "dev": {
+        "id": "dev",
+        "created": 1776703233,
+        "domain": "dev-sandbox-12.pantheonsite.io",
+        "connection_mode": "git",
+        "locked": false,
+        "initialized": true
+    },
+    "live": {
+        "id": "live",
+        "created": 1776703239,
+        "domain": "live-sandbox-12.pantheonsite.io",
+        "connection_mode": "git",
+        "locked": false,
+        "initialized": true
+    }
+}

@@ -1,0 +1,26 @@
+{
+    "dev": {
+        "id": "dev",
+        "created": 1768231662,
+        "domain": "dev-acme-portal.pantheonsite.io",
+        "connection_mode": "git",
+        "locked": false,
+        "initialized": true
+    },
+    "test": {
+        "id": "test",
+        "created": 1768231666,
+        "domain": "test-acme-portal.pantheonsite.io",
+        "connection_mode": "git",
+        "locked": false,
+        "initialized": true
+    },
+    "live": {
+        "id": "live",
+        "created": 1768231666,
+        "domain": "live-acme-portal.pantheonsite.io",
+        "connection_mode": "git",
+        "locked": false,
+        "initialized": true
+    }
+}

@@ -1,0 +1,65 @@
+{
+    "1793098800_automated_files": {
+        "file": "acme-web_live_2026-10-27T11-00-00_UTC_files.tar.gz",
+        "size": "7350.7MB",
+        "date": 1793100016.303523,
+        "expiry": 1793791216.303523,
+        "initiator": "automated"
+    },
+    "1793098800_automated_database": {
+        "file": "acme-web_live_2026-10-27T11-00-00_UTC_database.sql.gz",
+        "size": "172.9MB",
+        "date": 1793099911.855398,
+        "expiry": 1793791111.855398,
+        "initiator": "automated"
+    },
+    "1793098800_automated_code": {
+        "file": "acme-web_live_2026-10-27T11-00-00_UTC_code.tar.gz",
+        "size": "289.2MB",
+        "date": 1793099823.85023,
+        "expiry": 1793791023.85023,
+        "initiator": "automated"
+    },
+    "1793012400_automated_files": {
+        "file": "acme-web_live_2026-10-26T11-00-00_UTC_files.tar.gz",
+        "size": "7350.5MB",
+        "date": 1793013652.908888,
+        "expiry": 1793704852.908888,
+        "initiator": "automated"
+    },
+    "1793012400_automated_database": {
+        "file": "acme-web_live_2026-10-26T11-00-00_UTC_database.sql.gz",
+        "size": "172.7MB",
+        "date": 1793013430.851317,
+        "expiry": 1793704630.851317,
+        "initiator": "automated"
+    },
+    "1793012400_automated_code": {
+        "file": "acme-web_live_2026-10-26T11-00-00_UTC_code.tar.gz",
+        "size": "289.2MB",
+        "date": 1793013516.445985,
+        "expiry": 1793704716.445985,
+        "initiator": "automated"
+    },
+    "1792926000_automated_files": {
+        "file": "acme-web_live_2026-10-25T11-00-00_UTC_files.tar.gz",
+        "size": "7351.2MB",
+        "date": 1792927213.548643,
+        "expiry": 1793618413.548643,
+        "initiator": "automated"
+    },
+    "1792926000_automated_database": {
+        "file": "acme-web_live_2026-10-25T11-00-00_UTC_database.sql.gz",
+        "size": "172.2MB",
+        "date": 1792926997.418359,
+        "expiry": 1793618197.418359,
+        "initiator": "automated"
+    },
+    "1792926000_automated_code": {
+        "file": "acme-web_live_2026-10-25T11-00-00_UTC_code.tar.gz",
+        "size": "289.2MB",
+        "date": 1792927040.616696,
+        "expiry": 1793618240.616696,
+        "initiator": "automated"
+    }
+}
