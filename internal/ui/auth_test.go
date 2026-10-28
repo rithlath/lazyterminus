@@ -43,3 +43,20 @@ func TestSessionExpiryMidUse(t *testing.T) {
 	h.keys("O")
 	h.waitText("workflow:list acme-web: terminus workflow:list: You are not logged in.")
 }
+
+// Logging in elsewhere clears the badge on the next successful call, without
+// r on the Sites panel.
+func TestBadgeClearsAfterLoginElsewhere(t *testing.T) {
+	mock := testMock(t)
+	h := startWith(t, mock, Options{Site: "acme-web"}, false, 130, 40)
+	h.waitText("dev@example.com")
+	h.waitText("feedback")
+	mock.SetLoggedIn(false)
+	h.keys("4", "r")
+	h.waitText("✗ not logged in")
+	mock.SetLoggedIn(true)
+	h.keys("r") // workflow:list again, still on the Workflows panel
+	h.waitFor("logged-out badge cleared", func(s string) bool {
+		return !strings.Contains(s, "✗ not logged in") && strings.Contains(s, "dev@example.com")
+	})
+}

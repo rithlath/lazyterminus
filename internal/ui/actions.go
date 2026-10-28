@@ -166,6 +166,7 @@ func (m *Model) onJobMsg(msg tea.Msg) tea.Cmd {
 		} else {
 			m.setStatus(theme.SymSuccess+" "+j.Title+" finished", false)
 			m.logOutput(theme.OK.Render(theme.SymSuccess + " " + j.Title + " finished"))
+			cmds = append(cmds, m.recheckAuth())
 			if next := m.afterJob[j.ID]; next != nil {
 				cmds = append(cmds, next(m))
 			}

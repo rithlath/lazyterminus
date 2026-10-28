@@ -204,6 +204,8 @@ type DetailData struct {
 	AheadKnown      bool
 	Diffstat        []terminus.DiffstatEntry
 	DiffstatKnown   bool
+	Recent          []terminus.Commit // the environment's own log, newest first
+	RecentKnown     bool
 	LastDeploy      *terminus.Workflow
 	Failed          *terminus.Workflow
 	FailReason      string
@@ -320,11 +322,28 @@ func Detail(d DetailData, width, height int) []string {
 				theme.MutedText.Render(fmt.Sprintf("+%d −%d", f.Additions, f.Deletions))))
 		}
 	}
+	out = append(out, "", theme.Bold.Render("Recent commits on "+e.ID+":"))
+	switch {
+	case !d.RecentKnown:
+		out = append(out, theme.MutedText.Render("  loading…"))
+	case len(d.Recent) == 0:
+		out = append(out, theme.MutedText.Render("  none"))
+	}
+	for _, c := range d.Recent[:min(len(d.Recent), recentCommits)] {
+		// Shorten the message, not who and when.
+		who := "— " + c.Author + " · " + Ago(c.Time(), d.Now)
+		msg, _, _ := strings.Cut(strings.TrimSpace(c.Message), "\n")
+		msg = Fit(msg, max(width-2-len(short(c.Hash))-1-lipgloss.Width(who)-1, 12))
+		out = append(out, fmt.Sprintf("  %s %s %s", theme.Warn.Render(short(c.Hash)), msg, theme.MutedText.Render(who)))
+	}
 	if len(out) > height && height > 0 {
 		out = append(out[:height-1], theme.MutedText.Render(fmt.Sprintf("… %d more lines", len(out)-height+1)))
 	}
 	return out
 }
+
+// recentCommits is how many of an environment's own commits Detail lists.
+const recentCommits = 8
 
 func short(h string) string {
 	if len(h) > 7 {

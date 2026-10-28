@@ -191,6 +191,26 @@ func (f *form) update(m *Model, msg tea.Msg) (bool, tea.Cmd) {
 	return false, nil
 }
 
+// click focuses the field on line; a toggle flips and a choice advances.
+func (f *form) click(_ *Model, line int, _ bool) (bool, tea.Cmd) {
+	i := line - len(f.intro)
+	if len(f.intro) > 0 {
+		i-- // the blank line after the intro
+	}
+	if i < 0 || i >= len(f.fields) {
+		return false, nil
+	}
+	f.err = ""
+	cmd := f.focusField(i)
+	switch fl := &f.fields[i]; fl.kind {
+	case fieldToggle:
+		fl.on = !fl.on
+	case fieldSelect:
+		fl.idx = (fl.idx + 1) % len(fl.options)
+	}
+	return false, cmd
+}
+
 func (f *form) view(width int) (string, []string, string) {
 	lines := append([]string{}, f.intro...)
 	if len(f.intro) > 0 {

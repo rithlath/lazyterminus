@@ -504,8 +504,13 @@ func (m *Model) renderPipeline(w, h int) string {
 	footer := m.pipelineFooter(innerW, max(innerH/3, 3))
 	graphH := max(innerH-2-len(footer), 1)
 	lines := []string{legend, ""}
-	lines = append(lines, pipeline.Render(g, innerW, graphH, m.selectedEnv(), m.frame)...)
+	graph, hits := pipeline.RenderHits(g, innerW, graphH, m.selectedEnv(), m.frame)
+	lines = append(lines, graph...)
 	lines = append(lines, footer...)
+	const gx, gy = 2, 3 // graph origin: border and padding, legend, blank line
+	for _, ht := range hits {
+		m.zones.add(gx+ht.X, gy+ht.Y, ht.W, min(ht.H, graphH-ht.Y), clickTarget{kind: clickPipe, str: ht.ID})
+	}
 	title := " Pipeline "
 	if s := m.site(); s != "" {
 		title = " Pipeline · " + s + " "
@@ -514,6 +519,7 @@ func (m *Model) renderPipeline(w, h int) string {
 		}
 	}
 	hint := fmt.Sprintf(" ←/→ select · enter actions · %s deploy · %s/esc back ", m.keys.Key(ActDeploy), m.keys.Key(ActPipeline))
+	m.zones.footer(hint, 0, h-1, w)
 	return panels.Box(title, lines, w, h, true, hint)
 }
 

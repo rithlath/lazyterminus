@@ -156,6 +156,19 @@ On the selected environment:
 Rebind anything in the config under `keymap:` using the action names shown in
 `?` help.
 
+### Mouse
+
+Anything with a key can also be clicked. A click selects a site, environment,
+workflow or pipeline box; a double or right click acts like `enter` (on an
+environment, the action menu). The key hints along the bottom, and in a
+dialog's footer, are the keys themselves: clicking `c cache` is pressing `c`,
+so every form and confirmation still applies. In a dialog, click a menu entry
+to run it, a palette entry to choose it, or a form field to focus it (toggles
+flip, choices advance). A click outside a dialog cancels it, and the wheel
+moves the selection as before.
+
+While lazyterminus has the mouse, hold Shift to select and copy text.
+
 ### Action menu
 
 `enter` on an environment (in the Environments or Detail panel, or on a box
@@ -390,7 +403,7 @@ internal/catalog/   terminus list → palette catalog, cache, search
 internal/jobs/      background job queue
 internal/cache/     TTL cache
 internal/config/    config loading, XDG paths
-internal/ui/        root model, actions, palette, forms, modals, keymap
+internal/ui/        root model, actions, palette, forms, modals, keymap, mouse
 internal/ui/panels/ panel renderers
 testdata/           scrubbed fixtures and the mock scenario
 ```

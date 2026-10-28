@@ -71,10 +71,15 @@ type Model struct {
 	bar      progress.Model
 	spinning bool
 
-	status    string
-	statusErr bool
-	account   string // logged-in Terminus account, from auth:whoami
-	loggedOut bool
+	status      string
+	statusErr   bool
+	account     string // logged-in Terminus account, from auth:whoami
+	loggedOut   bool
+	authPending bool // a recheckAuth whoami is in flight
+
+	zones       *zoneList // where this frame drew clickable things (set by View)
+	lastClick   string    // last click's target, for double clicks
+	lastClickAt time.Time
 
 	showHelp   bool
 	showOutput bool
@@ -389,6 +394,16 @@ func (m *Model) logOutput(lines ...string) {
 	m.outputView.GotoBottom()
 }
 
+// recheckAuth re-runs auth:whoami when a terminus call succeeds while the
+// logged-out badge is up, so logging in elsewhere clears it without r.
+func (m *Model) recheckAuth() tea.Cmd {
+	if !m.loggedOut || m.authPending {
+		return nil
+	}
+	m.authPending = true
+	return checkAuth(m.client)
+}
+
 func (m *Model) reportErr(context string, err error) {
 	if terminus.IsNotLoggedIn(err) {
 		// Session missing or expired: one clear instruction instead of
@@ -429,6 +444,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case jobs.StepMsg, jobs.LineMsg, jobs.DoneMsg:
 		return m, m.onJobMsg(msg)
+
+	case clickMsg:
+		return m.handleClick(msg)
 
 	case deployPreviewMsg:
 		return m, m.onDeployPreview(msg)
@@ -476,6 +494,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case authMsg:
+		m.authPending = false
 		if msg.err != nil {
 			m.reportErr("auth:whoami", msg.err)
 			return m, nil
@@ -586,7 +605,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.client.InvalidateSite(msg.site)
 			cmds = append(cmds, m.ensureSite(msg.site, true))
 		}
-		cmds = append(cmds, m.ensureOps(msg.site), m.startSpinner(), m.startAnim())
+		cmds = append(cmds, m.ensureOps(msg.site), m.startSpinner(), m.startAnim(), m.recheckAuth())
 		return m, tea.Batch(cmds...)
 
 	case codeLogMsg:

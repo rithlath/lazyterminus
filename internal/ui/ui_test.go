@@ -145,36 +145,6 @@ func (h *harness) typeText(s string) {
 	time.Sleep(5 * time.Millisecond)
 }
 
-// keyMsg builds a key press for a key string as KeyPressMsg.String()
-// reports it.
-func keyMsg(k string) tea.KeyPressMsg {
-	switch k {
-	case "tab":
-		return tea.KeyPressMsg{Code: tea.KeyTab}
-	case "shift+tab":
-		return tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
-	case "enter":
-		return tea.KeyPressMsg{Code: tea.KeyEnter}
-	case "esc":
-		return tea.KeyPressMsg{Code: tea.KeyEscape}
-	case "space":
-		return tea.KeyPressMsg{Code: tea.KeySpace, Text: " "}
-	case "backspace":
-		return tea.KeyPressMsg{Code: tea.KeyBackspace}
-	case "up":
-		return tea.KeyPressMsg{Code: tea.KeyUp}
-	case "down":
-		return tea.KeyPressMsg{Code: tea.KeyDown}
-	case "ctrl+c":
-		return tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}
-	}
-	r := []rune(k)[0]
-	if r >= 'A' && r <= 'Z' {
-		return tea.KeyPressMsg{Code: r + ('a' - 'A'), ShiftedCode: r, Text: k, Mod: tea.ModShift}
-	}
-	return tea.KeyPressMsg{Code: r, Text: k}
-}
-
 func TestKeyMsgStrings(t *testing.T) {
 	for _, k := range []string{"tab", "shift+tab", "enter", "esc", "D", "j", ":", "?", "ctrl+c", "1"} {
 		if got := keyMsg(k).String(); got != k {
@@ -295,4 +265,13 @@ func TestPollingPicksUpNewWorkflows(t *testing.T) {
 	h.waitText("Automated backup")
 	go func() { _, _, _ = mock.Run(t.Context(), "env:clear-cache", "acme-web.dev") }()
 	h.waitText(`Clear cache for "dev"`)
+}
+
+func TestDetailShowsRecentCommits(t *testing.T) {
+	h := start(t, Options{Site: "acme-web", Env: "acme-web.live"}, 130, 50)
+	h.waitText("Recent commits on live:")
+	h.waitText("39634da Test/live build artifacts")
+	h.waitText("— Pantheon Automation · ") // author and age survive a long message
+	h.click("test        git")
+	h.waitText("Recent commits on test:")
 }

@@ -16,7 +16,7 @@ import (
 // WideWidth is the minimum width for the two-column layout.
 const WideWidth = 100
 
-type rect struct{ w, h int }
+type rect struct{ x, y, w, h int }
 
 // layout computes panel sizes. Wide: Sites over Environments on the left,
 // Detail over Workflows on the right. Narrow: all four stacked, with the
@@ -31,10 +31,10 @@ func (m *Model) layout() (wide bool, sizes [numPanels]rect) {
 			sitesH = min(5, bodyH/3) // room for the not-logged-in hint
 		}
 		detailH := bodyH * 11 / 20
-		sizes[panelSites] = rect{leftW, sitesH}
-		sizes[panelEnvs] = rect{leftW, bodyH - sitesH}
-		sizes[panelDetail] = rect{rightW, detailH}
-		sizes[panelWorkflows] = rect{rightW, bodyH - detailH}
+		sizes[panelSites] = rect{0, 0, leftW, sitesH}
+		sizes[panelEnvs] = rect{0, sitesH, leftW, bodyH - sitesH}
+		sizes[panelDetail] = rect{leftW, 0, rightW, detailH}
+		sizes[panelWorkflows] = rect{leftW, detailH, rightW, bodyH - detailH}
 		return true, sizes
 	}
 	// Narrow: minimum 3 rows each (border + one line); sites is capped at its
@@ -58,16 +58,22 @@ func (m *Model) layout() (wide bool, sizes [numPanels]rect) {
 			break
 		}
 	}
+	y := 0
 	for p := range numPanels {
-		sizes[p] = rect{m.width, h[p]}
+		sizes[p] = rect{0, y, m.width, h[p]}
+		y += h[p]
 	}
 	return false, sizes
 }
 
 // View implements tea.Model.
 func (m Model) View() tea.View {
+	zs := &zoneList{}
+	m.zones = zs
 	v := tea.NewView(m.render())
 	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
+	v.OnMouse = onMouse(zs.list)
 	v.WindowTitle = "lazyterminus"
 	if s := m.site(); s != "" {
 		v.WindowTitle = "lazyterminus · " + s
@@ -80,7 +86,7 @@ func (m Model) render() string {
 		return ""
 	}
 	status := m.statusBar()
-	hints := m.hintLine()
+	hints, spans := m.hintLine()
 	bodyH := max(m.height-2, 1)
 	var body string
 	switch {
@@ -104,6 +110,11 @@ func (m Model) render() string {
 	}
 	if m.modal != nil {
 		body = m.overlay(body, bodyH)
+	} else {
+		y := lipgloss.Height(body) + 1
+		for _, s := range spans {
+			m.zones.add(s.x, y, s.w, 1, clickTarget{kind: clickKey, str: s.key})
+		}
 	}
 	out := lipgloss.JoinVertical(lipgloss.Left, body, status, hints)
 	// Never exceed the terminal: clip any overflow rows.
@@ -214,7 +225,39 @@ func (m *Model) renderPanel(p int, r rect) string {
 			footer = fmt.Sprintf(" %d running ", running)
 		}
 	}
+	m.rowZones(p, r, len(lines))
 	return panels.Box(title, lines, r.w, r.h, focused, footer)
+}
+
+// rowZones registers panel p's n visible body lines as its rows, then the
+// whole panel (a click there focuses it).
+func (m *Model) rowZones(p int, r rect, n int) {
+	n = min(n, r.h-2)
+	row := func(i, index int) {
+		m.zones.add(r.x+1, r.y+1+i, r.w-2, 1, clickTarget{kind: clickRow, panel: p, index: index})
+	}
+	switch p {
+	case panelSites:
+		for i := range n {
+			if idx := m.siteList.Offset + i; idx < len(m.sites) {
+				row(i, idx)
+			}
+		}
+	case panelEnvs:
+		rows := m.envRows()
+		for i := range n {
+			if idx := m.envList.Offset + i; idx < len(rows) && !rows[idx].Divider {
+				row(i, idx)
+			}
+		}
+	case panelWorkflows:
+		if len(m.state(m.site()).wfs) > 0 || len(m.jobRows()) > 0 {
+			for i := range n {
+				row(i, m.wfList.Offset+i)
+			}
+		}
+	}
+	m.zones.add(r.x, r.y, r.w, r.h, clickTarget{kind: clickPanel, panel: p})
 }
 
 // detailData assembles the Detail panel for the selected environment.
@@ -241,6 +284,7 @@ func (m *Model) detailData() panels.DetailData {
 	if ds, ok := st.diffstat[envID]; ok {
 		d.Diffstat, d.DiffstatKnown = ds, true
 	}
+	d.Recent, d.RecentKnown = st.codeLogs[envID]
 	if wf, ok := terminus.LastDeploy(st.wfs, envID); ok {
 		d.LastDeploy = &wf
 	}
@@ -316,7 +360,13 @@ func (m Model) statusBar() string {
 	return panels.Fit(left+mid+" "+theme.Bold.Render(right), m.width)
 }
 
-func (m Model) hintLine() string {
+// hintSpan is where a key hint landed on the hint line.
+type hintSpan struct {
+	x, w int
+	key  string
+}
+
+func (m Model) hintLine() (string, []hintSpan) {
 	type hint struct{ action, label string }
 	var hs []hint
 	switch {
@@ -338,12 +388,20 @@ func (m Model) hintLine() string {
 	}
 	hs = append(hs, hint{ActPalette, "palette"}, hint{ActLazygit, "lazygit"}, hint{ActHelp, "help"}, hint{ActQuit, "quit"})
 	var parts []string
+	var spans []hintSpan
+	x := 0
 	for _, h := range hs {
 		if k := m.keys.Key(h.action); k != "" && k != "—" {
-			parts = append(parts, theme.Key.Render(k)+" "+theme.MutedText.Render(h.label))
+			part := theme.Key.Render(k) + " " + theme.MutedText.Render(h.label)
+			w := min(lipgloss.Width(part), m.width-x)
+			if w > 0 {
+				spans = append(spans, hintSpan{x, w, k})
+			}
+			parts = append(parts, part)
+			x += lipgloss.Width(part) + 2
 		}
 	}
-	return panels.Fit(strings.Join(parts, "  "), m.width)
+	return panels.Fit(strings.Join(parts, "  "), m.width), spans
 }
 
 func (m Model) helpLines() []string {
@@ -368,6 +426,10 @@ func (m Model) helpLines() []string {
 			theme.Warn.Render(theme.SymRunning)+" running   "+theme.Fail.Render(theme.SymFailed)+" failed   "+theme.MutedText.Render(theme.SymUnknown)+" unknown",
 		"  "+theme.Warn.Render(theme.SymAhead+"3")+" commits ready to deploy here (multidevs: ahead of dev)   "+theme.SFTP.Render("sftp")+" on-server development",
 		"",
+		theme.Bold.Render("Mouse"),
+		"  click selects · double or right click opens the action menu · click a key hint to press it",
+		"  "+theme.MutedText.Render("hold Shift to select and copy text"),
+		"",
 		theme.MutedText.Render("Rebind keys in "+m.cfg.Path+" under keymap: (action name → keys)."),
 	)
 	return out
@@ -378,18 +440,35 @@ func (m Model) overlay(body string, bodyH int) string {
 	w := min(max(m.width*3/4, 50), 110, m.width)
 	title, lines, footer := m.modal.view(w - 4)
 	var wrapped []string
-	for _, l := range lines {
+	var src []int // the view line each wrapped line came from; -1 none
+	for i, l := range lines {
 		if lipgloss.Width(l) <= w-4 {
-			wrapped = append(wrapped, l)
+			wrapped, src = append(wrapped, l), append(src, i)
 			continue
 		}
-		wrapped = append(wrapped, strings.Split(lipgloss.Wrap(l, w-4, " /"), "\n")...)
+		for _, part := range strings.Split(lipgloss.Wrap(l, w-4, " /"), "\n") {
+			wrapped, src = append(wrapped, part), append(src, i)
+		}
 	}
 	h := min(len(wrapped)+2, bodyH)
 	if len(wrapped) > h-2 && h > 3 { // keep the tail (confirmation input) visible
 		wrapped = append([]string{theme.MutedText.Render("…")}, wrapped[len(wrapped)-(h-3):]...)
+		src = append([]int{-1}, src[len(src)-(h-3):]...)
 	}
 	box := panels.Box(" "+title+" ", wrapped, w, h, true, footer)
 	x, y := (m.width-w)/2, max((bodyH-h)/2, 0)
+
+	// Nothing behind the modal takes clicks; a click outside it is esc.
+	m.zones.reset()
+	if _, ok := m.modal.(clickable); ok {
+		for i := range min(len(wrapped), h-2) {
+			if src[i] >= 0 {
+				m.zones.add(x+1, y+1+i, w-2, 1, clickTarget{kind: clickModal, index: src[i]})
+			}
+		}
+	}
+	m.zones.footer(footer, x, y+h-1, w)
+	m.zones.add(x, y, w, h, clickTarget{kind: clickNone})
+	m.zones.add(0, 0, m.width, m.height, clickTarget{kind: clickOutside})
 	return lipgloss.NewCompositor(lipgloss.NewLayer(body), lipgloss.NewLayer(box).X(x).Y(y).Z(1)).Render()
 }

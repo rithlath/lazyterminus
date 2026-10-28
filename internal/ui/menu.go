@@ -196,6 +196,26 @@ func (a *actionMenu) update(m *Model, msg tea.Msg) (bool, tea.Cmd) {
 	return false, nil
 }
 
+// click runs the item on line (as its key would).
+func (a *actionMenu) click(m *Model, line int, _ bool) (bool, tea.Cmd) {
+	l, shownOff := 0, false
+	for i, it := range a.items {
+		if it.disabled != "" && !shownOff {
+			l, shownOff = l+1, true // the "not available here" divider
+		}
+		if l == line {
+			if it.disabled != "" {
+				m.setStatus(it.label+": "+it.disabled, true)
+				return false, nil
+			}
+			a.cursor = i
+			return true, a.run(m, it)
+		}
+		l++
+	}
+	return false, nil
+}
+
 func (a *actionMenu) view(width int) (string, []string, string) {
 	var lines []string
 	shownOff := false

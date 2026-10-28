@@ -149,7 +149,7 @@ func (p *promptModal) update(m *Model, msg tea.Msg) (bool, tea.Cmd) {
 }
 
 func (p *promptModal) view(int) (string, []string, string) {
-	return p.title, []string{p.question, "", theme.Key.Render("y") + " yes   " + theme.Key.Render("n") + " no"}, " y/n "
+	return p.title, []string{p.question, "", theme.Key.Render("y") + " yes   " + theme.Key.Render("n") + " no"}, " y yes · n no "
 }
 
 // infoModal shows text (e.g. "nothing to deploy").

@@ -152,18 +152,49 @@ func (s styles) state(st State) int {
 // Render draws g into exactly w×h cells and returns the lines. sel is the
 // selected environment; frame drives the animation.
 func Render(g Graph, w, h int, sel string, frame int) []string {
+	lines, _ := RenderHits(g, w, h, sel, frame)
+	return lines
+}
+
+// Hit is where an environment was drawn, for the mouse. More marks the
+// "+N more" line; its ID is the hidden multidev a click scrolls to.
+type Hit struct {
+	ID         string
+	X, Y, W, H int
+	More       bool
+}
+
+// RenderHits is Render plus where each environment landed.
+func RenderHits(g Graph, w, h int, sel string, frame int) ([]string, []Hit) {
 	cv := newCanvas(w, h)
 	s := newStyles(cv)
 	if len(g.Main) == 0 && len(g.Multidevs) == 0 {
 		cv.text(0, 0, "No environments loaded.", w, s.muted)
-		return cv.lines()
+		return cv.lines(), nil
 	}
 	if w >= MinWideWidth {
 		renderWide(cv, s, g, sel, frame)
 	} else {
 		renderNarrow(cv, s, g, sel, frame)
 	}
-	return cv.lines()
+	return cv.lines(), cv.hits
+}
+
+func (cv *canvas) hit(id string, x, y, w, h int) {
+	cv.hits = append(cv.hits, Hit{ID: id, X: x, Y: y, W: w, H: h})
+}
+
+// nextHidden is the multidev a click on "+N more" selects: the first one
+// below the window, or the first one when the window is at the end.
+func nextHidden(mds, shown []Node) string {
+	if len(shown) == 0 {
+		return mds[0].ID
+	}
+	last := indexOf(mds, shown[len(shown)-1].ID)
+	if last+1 >= len(mds) {
+		return mds[0].ID
+	}
+	return mds[last+1].ID
 }
 
 const (
@@ -185,6 +216,7 @@ func drawNode(cv *canvas, s styles, n Node, x, y, w int, selected bool, frame in
 		b, bst, tst = double, s.accent, s.accent
 	}
 	cv.box(x, y, w, boxH, b, bst, n.ID, tst)
+	cv.hit(n.ID, x, y, w, boxH)
 	inner := x + w - 2
 	cx := x + 2
 	sym := n.State.Symbol()
@@ -227,6 +259,7 @@ func drawMultidev(cv *canvas, s styles, n Node, x, y, w int, selected bool, fram
 		b, bst, tst = double, s.accent, s.accent
 	}
 	cv.box(x, y, w, mdBoxH, b, bst, n.ID, tst)
+	cv.hit(n.ID, x, y, w, mdBoxH)
 	sym := n.State.Symbol()
 	if n.State == Running {
 		sym = string([]rune("◐◓◑◒")[frame%4])
@@ -360,6 +393,7 @@ func renderWide(cv *canvas, s styles, g Graph, sel string, frame int) {
 		}
 		if more > 0 {
 			cv.text(1, 1+len(shown)*mdBoxH, fmt.Sprintf("+%d more (←/→ to scroll)", more), mdW+trunk, s.muted)
+			cv.hits = append(cv.hits, Hit{ID: nextHidden(g.Multidevs, shown), X: 1, Y: 1 + len(shown)*mdBoxH, W: mdW + trunk - 1, H: 1, More: true})
 		}
 	} else {
 		cv.drawPaths(paths)
@@ -410,10 +444,12 @@ func renderNarrow(cv *canvas, s styles, g Graph, sel string, frame int) {
 				line += " · " + m.Extra
 			}
 			cv.text(0, y, line, bw, st)
+			cv.hit(m.ID, 0, y, bw, 1)
 			y++
 		}
 		if more > 0 {
 			cv.text(2, y, fmt.Sprintf("+%d more", more), bw, s.muted)
+			cv.hits = append(cv.hits, Hit{ID: nextHidden(g.Multidevs, shown), X: 2, Y: y, W: bw - 2, H: 1, More: true})
 			y++
 		}
 	}

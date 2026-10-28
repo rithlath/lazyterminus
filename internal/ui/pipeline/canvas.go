@@ -26,6 +26,7 @@ type canvas struct {
 	cells [][]cell
 	st    []lipgloss.Style
 	idx   map[skey]int
+	hits  []Hit
 }
 
 func newCanvas(w, h int) *canvas {

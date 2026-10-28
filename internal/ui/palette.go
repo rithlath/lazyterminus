@@ -160,6 +160,16 @@ func (p *paletteModal) update(m *Model, msg tea.Msg) (bool, tea.Cmd) {
 	return false, cmd
 }
 
+// click chooses the command on line (lines 0-1 are the input and context).
+func (p *paletteModal) click(m *Model, line int, _ bool) (bool, tea.Cmd) {
+	i := p.offset + line - 2
+	if line < 2 || i >= len(p.matches) {
+		return false, nil
+	}
+	p.cursor = i
+	return p.update(m, keyMsg("enter"))
+}
+
 func (p *paletteModal) view(width int) (string, []string, string) {
 	p.input.SetWidth(max(width-4, 10))
 	lines := []string{p.input.View(), ""}
