@@ -34,6 +34,11 @@ type Options struct {
 	Now func() time.Time
 	// CatalogDir overrides where the command catalog is cached (tests).
 	CatalogDir string
+	// OpenURL overrides opening a URL in the browser (tests).
+	OpenURL func(url string) error
+	// NoExecPause skips "press Enter to return" after an interactive
+	// command (tests).
+	NoExecPause bool
 }
 
 // Panel identifiers, in tab order.
@@ -317,7 +322,7 @@ func (m *Model) ensureEnvData(site string, force bool) tea.Cmd {
 	var cmds []tea.Cmd
 	need := func(env string) {
 		if _, ok := st.codeLogs[env]; (force || !ok) && st.begin("codelog:"+env) {
-			cmds = append(cmds, loadCodeLog(m.client, site, env, force))
+			cmds = append(cmds, loadCodeLog(m.client, site, env, m.cfg.RepoFor(site), force))
 		}
 	}
 	need("dev")
@@ -575,7 +580,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.restoreEnvCursor(prevEnv)
-		return m, tea.Batch(m.ensureEnvData(msg.site, false), m.ensureOps(msg.site), m.ensureBranch())
+		return m, tea.Batch(m.ensureEnvData(msg.site, false), m.ensureOps(msg.site), m.ensureBranch(), m.ensureDomains())
 
 	case workflowsMsg:
 		st := m.state(msg.site)
@@ -640,6 +645,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		st.ops[msg.id] = msg.ops
+		return m, nil
+
+	case domainsMsg:
+		m.onDomains(msg)
+		return m, nil
+
+	case openedMsg:
+		m.onOpened(msg)
 		return m, nil
 
 	case drupalMsg:
@@ -750,6 +763,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case ActDeploy, ActClearCache, ActBackup, ActCloneContent, ActConnectionMode, ActWake,
 		ActDrush, ActCommit, ActCreateMultidev, ActDeleteMultidev, ActUpstream:
 		return m, m.runAction(action)
+	case ActOpenURL:
+		return m, m.openEnvURL()
 	case ActHelp:
 		m.showHelp = true
 	case ActOutput:
@@ -807,7 +822,7 @@ func (m Model) move(delta int) (tea.Model, tea.Cmd) {
 		rows := m.envRows()
 		m.envList.Move(selectable(rows), delta)
 		m.detailOffset = 0
-		return m, tea.Batch(m.ensureOps(m.site()), m.ensureBranch())
+		return m, tea.Batch(m.ensureOps(m.site()), m.ensureBranch(), m.ensureDomains())
 	case panelDetail:
 		m.detailOffset = max(m.detailOffset+delta, 0)
 	case panelWorkflows:
@@ -838,6 +853,7 @@ func (m *Model) refresh() tea.Cmd {
 		st := m.state(site)
 		st.inflight = map[string]bool{}
 		st.codeLogs, st.diffstat = map[string][]terminus.Commit{}, map[string][]terminus.DiffstatEntry{}
+		st.domains = map[string][]terminus.Domain{}
 		return tea.Batch(m.ensureSite(site, true), m.startSpinner())
 	case panelDetail:
 		env := m.selectedEnv()
@@ -848,16 +864,17 @@ func (m *Model) refresh() tea.Cmd {
 		m.client.InvalidateEnv(site, env)
 		var cmds []tea.Cmd
 		if st.begin("codelog:" + env) {
-			cmds = append(cmds, loadCodeLog(m.client, site, env, true))
+			cmds = append(cmds, loadCodeLog(m.client, site, env, m.cfg.RepoFor(site), true))
 		}
 		if src := terminus.SourceEnv(env); src != "" && st.begin("codelog:"+src) {
-			cmds = append(cmds, loadCodeLog(m.client, site, src, true))
+			cmds = append(cmds, loadCodeLog(m.client, site, src, m.cfg.RepoFor(site), true))
 		}
 		if e := st.env(env); e != nil && e.ConnectionMode == "sftp" && st.begin("diffstat:"+env) {
 			cmds = append(cmds, loadDiffstat(m.client, site, env, true))
 		}
+		delete(st.domains, env)
 		st.drupalLoaded = false
-		cmds = append(cmds, m.ensureSite(site, false), m.startSpinner())
+		cmds = append(cmds, m.ensureSite(site, false), m.ensureDomains(), m.startSpinner())
 		return tea.Batch(cmds...)
 	case panelWorkflows:
 		if site == "" {

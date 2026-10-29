@@ -36,7 +36,7 @@ func (m *Model) envMenuItems(site string, e *terminus.Env) []menuItem {
 	st := m.state(site)
 	readOnly := m.cfg.ReadOnly
 	item := func(action, label, disabled string) menuItem {
-		if readOnly && disabled == "" && action != ActUpstream && action != menuPalette {
+		if readOnly && disabled == "" && action != ActUpstream && action != ActOpenURL && action != menuPalette {
 			disabled = "read_only is on"
 		}
 		return menuItem{action: action, label: label, disabled: disabled}
@@ -108,10 +108,13 @@ func (m *Model) envMenuItems(site string, e *terminus.Env) []menuItem {
 		items = append(items, item(ActDeleteMultidev, "Delete multidev", "multidevs only"))
 	}
 
-	items = append(items,
-		item(ActUpstream, "Upstream updates", ""),
-		item(menuPalette, "More Terminus commands for "+e.ID+"…", ""),
-	)
+	items = append(items, item(ActUpstream, "Upstream updates", ""))
+	if urls := m.envURLs(site, e.ID); len(urls) > 0 {
+		items = append(items, item(ActOpenURL, "Open "+urls[0]+" in browser", ""))
+	} else {
+		items = append(items, item(ActOpenURL, "Open in browser", "no domain yet"))
+	}
+	items = append(items, item(menuPalette, "More Terminus commands for "+e.ID+"…", ""))
 	// Available first, then the rest, keeping each group's order.
 	var on, off []menuItem
 	for _, it := range items {

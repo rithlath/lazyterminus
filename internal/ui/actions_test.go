@@ -1,10 +1,13 @@
 package ui
 
 import (
+	"os/exec"
 	"slices"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/rithlath/lazyterminus/internal/terminus"
 )
@@ -410,5 +413,34 @@ func TestRunnerRefusesUnapproved(t *testing.T) {
 	h.noCalls()
 	if !terminus.IsMutating([]string{"env:clear-cache"}) {
 		t.Fatal("classification changed")
+	}
+}
+
+func TestPausedExecWaitsForEnter(t *testing.T) {
+	for _, c := range []struct {
+		cmd     *exec.Cmd
+		wantErr bool
+		want    string
+	}{
+		{exec.Command("sh", "-c", "echo drush says hi"), false, "Finished"},
+		{exec.Command("sh", "-c", "echo boom; exit 3"), true, "exit status 3"},
+	} {
+		in := strings.NewReader("\n")
+		var out strings.Builder
+		p := &pausedExec{Cmd: c.cmd}
+		p.SetStdin(in)
+		p.SetStdout(&out)
+		p.SetStderr(&out)
+		err := p.Run()
+		if (err != nil) != c.wantErr {
+			t.Errorf("err = %v", err)
+		}
+		got := ansi.Strip(out.String())
+		if !strings.Contains(got, c.want) || !strings.Contains(got, "press Enter to return to lazyterminus") {
+			t.Errorf("output = %q", got)
+		}
+		if in.Len() != 0 {
+			t.Error("didn't wait for Enter")
+		}
 	}
 }

@@ -213,3 +213,6 @@ func ParseBackups(data []byte) ([]Backup, error) {
 func ParseUpstreamUpdates(data []byte) ([]UpstreamUpdate, error) {
 	return rowsOnly[UpstreamUpdate](data)
 }
+
+// ParseDomains parses domain:list output.
+func ParseDomains(data []byte) ([]Domain, error) { return rowsOnly[Domain](data) }

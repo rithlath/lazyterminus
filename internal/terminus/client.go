@@ -36,7 +36,7 @@ func key(parts ...string) string { return strings.Join(parts, "|") + "|" }
 
 // InvalidateSite drops every cached result for site.
 func (c *Client) InvalidateSite(site string) {
-	for _, kind := range []string{"envs", "codelog", "diffstat", "workflows", "upstream"} {
+	for _, kind := range []string{"envs", "codelog", "diffstat", "workflows", "upstream", "domains"} {
 		c.Cache.DeletePrefix(key(kind, site))
 	}
 }
@@ -45,6 +45,7 @@ func (c *Client) InvalidateSite(site string) {
 func (c *Client) InvalidateEnv(site, env string) {
 	c.Cache.Delete(key("codelog", site, env))
 	c.Cache.Delete(key("diffstat", site, env))
+	c.Cache.Delete(key("domains", site, env))
 }
 
 // Sites lists sites (site:list).
@@ -88,6 +89,17 @@ func (c *Client) Diffstat(ctx context.Context, site, env string, force bool) ([]
 			return nil, err
 		}
 		return ParseDiffstat(out)
+	})
+}
+
+// Domains lists an environment's domains (domain:list).
+func (c *Client) Domains(ctx context.Context, site, env string, force bool) ([]Domain, error) {
+	return cache.Typed(c.Cache, key("domains", site, env), TTLDefault, force, func() ([]Domain, error) {
+		out, err := c.run(ctx, "domain:list", SiteEnv(site, env), "--format=json", "--fields=*")
+		if err != nil {
+			return nil, err
+		}
+		return ParseDomains(out)
 	})
 }
 

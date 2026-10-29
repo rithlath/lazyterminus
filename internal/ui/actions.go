@@ -1,9 +1,13 @@
 package ui
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"os"
+	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -138,7 +142,46 @@ func (m *Model) execInteractive(actx context.Context, title, site string, args [
 		return nil
 	}
 	m.logOutput(theme.Bold.Render("▶ " + terminus.Args(args).String()))
-	return tea.ExecProcess(cmd, func(err error) tea.Msg { return execDoneMsg{title: title, site: site, err: err} })
+	done := func(err error) tea.Msg { return execDoneMsg{title: title, site: site, err: err} }
+	if m.opts.NoExecPause {
+		return tea.ExecProcess(cmd, done)
+	}
+	return tea.Exec(&pausedExec{Cmd: cmd, title: terminus.Args(args).String()}, done)
+}
+
+// pausedExec runs a command with the terminal, then waits for Enter before
+// lazyterminus redraws, so the command's output stays on screen to read.
+type pausedExec struct {
+	*exec.Cmd
+	title string // shown while the command connects, which can take a while
+	in    io.Reader
+	out   io.Writer
+}
+
+func (p *pausedExec) SetStdin(r io.Reader)  { p.Stdin, p.in = r, r }
+func (p *pausedExec) SetStdout(w io.Writer) { p.Stdout, p.out = w, w }
+func (p *pausedExec) SetStderr(w io.Writer) { p.Stderr = w }
+
+func (p *pausedExec) Run() error {
+	in, out := p.in, p.out
+	if in == nil {
+		in = os.Stdin
+	}
+	if out == nil {
+		out = os.Stdout
+	}
+	if p.title != "" {
+		fmt.Fprintf(out, "%s\n%s\n\n", theme.Bold.Render("▶ "+p.title), theme.MutedText.Render("Running on Pantheon; output appears when the command sends it…"))
+	}
+	err := p.Cmd.Run()
+	discardTypeahead(in)
+	status := theme.OK.Render(theme.SymSuccess + " Finished")
+	if err != nil {
+		status = theme.Fail.Render(theme.SymFailed + " " + err.Error())
+	}
+	fmt.Fprintf(out, "\n%s · %s ", status, theme.Bold.Render("press Enter to return to lazyterminus"))
+	_, _ = bufio.NewReader(in).ReadString('\n')
+	return err
 }
 
 // onJobMsg applies a job message and reacts to step changes and completion.
@@ -200,11 +243,12 @@ func (m *Model) runAction(action string) tea.Cmd {
 			return nil
 		}
 		m.setStatus("Loading commits that would deploy from "+src+"…", false)
-		c := m.client
+		c, repo := m.client, m.cfg.RepoFor(site)
 		return func() tea.Msg {
 			cx, cancel := ctx()
 			defer cancel()
 			log, err := c.CodeLog(cx, site, src, true)
+			log = withFullMessages(repo, log)
 			return deployPreviewMsg{site: site, env: e.ID, src: src, log: log, commits: terminus.DeployableCommits(log, src, e.ID), err: err}
 		}
 
@@ -247,7 +291,7 @@ func (m *Model) runAction(action string) tea.Cmd {
 	case ActDrush:
 		return m.open(&form{
 			title: "Drush · " + se,
-			intro: []string{theme.MutedText.Render("Runs with your terminal attached; lazyterminus resumes when it exits.")},
+			intro: []string{theme.MutedText.Render("Runs with your terminal attached; press Enter afterwards to return to lazyterminus.")},
 			fields: []formField{
 				textField("cmd", "drush", "", "status", true, nil),
 			},
@@ -443,7 +487,7 @@ func (m *Model) onDeployPreview(msg deployPreviewMsg) tea.Cmd {
 		"",
 	}
 	for _, c := range msg.commits {
-		intro = append(intro, fmt.Sprintf("  %s %s %s", theme.Warn.Render(short(c.Hash)), c.Message, theme.MutedText.Render("— "+c.Author)))
+		intro = append(intro, fmt.Sprintf("  %s %s %s", theme.Warn.Render(short(c.Hash)), c.Subject(), theme.MutedText.Render("— "+c.Author)))
 	}
 	dd := m.cfg.DeployDefaults
 	fields := []formField{

@@ -212,6 +212,8 @@ type DetailData struct {
 	Branch          string
 	LocalBranch     string // local git status for multidevs
 	UpstreamPending int    // -1 unknown
+	Domains         []terminus.Domain
+	DomainsKnown    bool
 	Err             string
 	Now             time.Time
 }
@@ -232,7 +234,22 @@ func Detail(d DetailData, width, height int) []string {
 	var out []string
 	add := func(l, v string) { out = append(out, field(l, v)) }
 
-	add("Domain", e.Domain)
+	add("URL", terminus.URL(e.Domain))
+	if custom := terminus.CustomDomains(d.Domains); len(custom) > 0 {
+		for i, c := range custom {
+			label := ""
+			if i == 0 {
+				label = "Custom"
+			}
+			v := terminus.URL(c.ID)
+			if c.Primary {
+				v += theme.MutedText.Render(" (primary)")
+			}
+			add(label, v)
+		}
+	} else if !d.DomainsKnown {
+		add("Custom", theme.MutedText.Render("loading…"))
+	}
 	mode := theme.MutedText.Render(e.ConnectionMode)
 	if e.ConnectionMode == "sftp" {
 		mode = theme.SFTP.Render("sftp") + theme.MutedText.Render(" (on-server development)")
@@ -312,7 +329,7 @@ func Detail(d DetailData, width, height int) []string {
 	if len(d.Ahead) > 0 {
 		out = append(out, "", theme.Bold.Render("Commits "+d.AheadLabel+":"))
 		for _, c := range d.Ahead {
-			out = append(out, fmt.Sprintf("  %s %s %s", theme.Warn.Render(short(c.Hash)), c.Message, theme.MutedText.Render("— "+c.Author)))
+			out = append(out, fmt.Sprintf("  %s %s %s", theme.Warn.Render(short(c.Hash)), c.Subject(), theme.MutedText.Render("— "+c.Author)))
 		}
 	}
 	if len(d.Diffstat) > 0 {
@@ -332,8 +349,7 @@ func Detail(d DetailData, width, height int) []string {
 	for _, c := range d.Recent[:min(len(d.Recent), recentCommits)] {
 		// Shorten the message, not who and when.
 		who := "— " + c.Author + " · " + Ago(c.Time(), d.Now)
-		msg, _, _ := strings.Cut(strings.TrimSpace(c.Message), "\n")
-		msg = Fit(msg, max(width-2-len(short(c.Hash))-1-lipgloss.Width(who)-1, 12))
+		msg := Fit(c.Subject(), max(width-2-len(short(c.Hash))-1-lipgloss.Width(who)-1, 12))
 		out = append(out, fmt.Sprintf("  %s %s %s", theme.Warn.Render(short(c.Hash)), msg, theme.MutedText.Render(who)))
 	}
 	if len(out) > height && height > 0 {

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/rithlath/lazyterminus/internal/jobs"
 	"github.com/rithlath/lazyterminus/internal/terminus"
@@ -267,7 +268,7 @@ func (m *Model) pipelineGraph() pipeline.Graph {
 		if haveLog {
 			n.State, n.Status = pipeline.OK, "in sync"
 			if len(log) > 0 {
-				n.Head = short(log[0].Hash) + " " + log[0].Message
+				n.Head = short(log[0].Hash) + " " + log[0].Subject()
 				if e.ID == "dev" || e.IsMultidev() {
 					n.When = "committed " + panels.Ago(log[0].Time(), now)
 				}
@@ -430,7 +431,7 @@ func (m *Model) pipelineFooter(width, maxLines int) []string {
 				add(theme.MutedText.Render(fmt.Sprintf("  … %d more", len(cs)-4)))
 				break
 			}
-			add(fmt.Sprintf("  %s %s %s", theme.Warn.Render(short(c.Hash)), c.Message, theme.MutedText.Render("— "+c.Author)))
+			add(fmt.Sprintf("  %s %s %s", theme.Warn.Render(short(c.Hash)), c.Subject(), theme.MutedText.Render("— "+c.Author)))
 		}
 	}
 	if env == "" {
@@ -489,11 +490,32 @@ func (m *Model) pipelineFooter(width, maxLines int) []string {
 		}
 		add(theme.Fail.Render(fmt.Sprintf("%s %s: %s failed %s: %s", theme.SymFailed, env, f.Workflow, panels.Ago(f.StartedAt.Time(), m.now()), reason)))
 	}
+	// The environment's own history fills what's left.
+	if room := min(maxLines-len(out)-1, pipeRecent); room > 0 {
+		log, ok := st.codeLogs[env]
+		add(theme.Bold.Render("Recent commits on " + env + ":"))
+		switch {
+		case !ok:
+			add(theme.MutedText.Render("  loading…"))
+		case len(log) == 0:
+			add(theme.MutedText.Render("  none"))
+		}
+		for _, c := range log[:min(len(log), room)] {
+			// Shorten the message, not who and when.
+			who := "— " + c.Author + " · " + panels.Ago(c.Time(), m.now())
+			msg := panels.Fit(c.Subject(), max(width-2-len(short(c.Hash))-1-ansi.StringWidth(who)-1, 12))
+			add(fmt.Sprintf("  %s %s %s", theme.Warn.Render(short(c.Hash)), msg, theme.MutedText.Render(who)))
+		}
+	}
 	if len(out) > maxLines {
 		out = out[:maxLines]
 	}
 	return out
 }
+
+// pipeRecent is how many of the selected environment's commits the
+// pipeline footer lists, room permitting.
+const pipeRecent = 8
 
 // renderPipeline draws the pipeline view body.
 func (m *Model) renderPipeline(w, h int) string {
@@ -501,7 +523,15 @@ func (m *Model) renderPipeline(w, h int) string {
 	g := m.pipelineGraph()
 	legend := theme.MutedText.Render("● in sync   ") + theme.Warn.Render("↑ waiting   ◐ running   ") +
 		theme.OK.Render("✓ landed   ") + theme.Fail.Render("✗ failed")
-	footer := m.pipelineFooter(innerW, max(innerH/3, 3))
+	budget := innerH / 3
+	if innerW >= pipeline.MinWideWidth { // boxes sit side by side; history gets more room
+		budget = innerH / 2
+	}
+	footer := m.pipelineFooter(innerW, max(budget, 3))
+	url, urls := m.urlLine(innerW)
+	if url != "" {
+		footer = append([]string{url}, footer...)
+	}
 	graphH := max(innerH-2-len(footer), 1)
 	lines := []string{legend, ""}
 	graph, hits := pipeline.RenderHits(g, innerW, graphH, m.selectedEnv(), m.frame)
@@ -511,6 +541,9 @@ func (m *Model) renderPipeline(w, h int) string {
 	for _, ht := range hits {
 		m.zones.add(gx+ht.X, gy+ht.Y, ht.W, min(ht.H, graphH-ht.Y), clickTarget{kind: clickPipe, str: ht.ID})
 	}
+	for _, u := range urls { // the URL line is the footer's first line
+		m.zones.add(gx+u.x, gy+graphH, u.w, 1, clickTarget{kind: clickURL, str: u.url})
+	}
 	title := " Pipeline "
 	if s := m.site(); s != "" {
 		title = " Pipeline · " + s + " "
@@ -518,7 +551,7 @@ func (m *Model) renderPipeline(w, h int) string {
 			title = " Pipeline · " + s + " · " + env + " "
 		}
 	}
-	hint := fmt.Sprintf(" ←/→ select · enter actions · %s deploy · %s/esc back ", m.keys.Key(ActDeploy), m.keys.Key(ActPipeline))
+	hint := fmt.Sprintf(" ←/→ select · enter actions · %s deploy · %s open · %s/esc back ", m.keys.Key(ActDeploy), m.keys.Key(ActOpenURL), m.keys.Key(ActPipeline))
 	m.zones.footer(hint, 0, h-1, w)
 	return panels.Box(title, lines, w, h, true, hint)
 }
@@ -531,7 +564,7 @@ func (m *Model) selectEnv(id string) tea.Cmd {
 		if !r.Divider && r.Name == id {
 			m.envList.Cursor = i
 			m.detailOffset = 0
-			return tea.Batch(m.ensureOps(m.site()), m.ensureBranch())
+			return tea.Batch(m.ensureOps(m.site()), m.ensureBranch(), m.ensureDomains())
 		}
 	}
 	return nil

@@ -147,11 +147,12 @@ On the selected environment:
 | `l` | clone content from another environment | `env:clone-content` |
 | `m` | toggle git/sftp (dev and multidevs) | `connection:set` |
 | `w` | wake | `env:wake` |
-| `x` | drush, with your terminal attached | `remote:drush` |
+| `x` | drush, with your terminal attached (press Enter afterwards to return) | `remote:drush` |
 | `o` | commit SFTP changes | `env:commit` |
 | `n` | create multidev | `multidev:create` |
 | `D` | delete multidev | `multidev:delete` |
 | `u` | upstream updates (shown in Output) | `upstream:updates:list` |
+| `v` | open in the browser (primary custom domain, else `*.pantheonsite.io`) | `domain:list` |
 
 Rebind anything in the config under `keymap:` using the action names shown in
 `?` help.
@@ -162,7 +163,8 @@ Anything with a key can also be clicked. A click selects a site, environment,
 workflow or pipeline box; a double or right click acts like `enter` (on an
 environment, the action menu). The key hints along the bottom, and in a
 dialog's footer, are the keys themselves: clicking `c cache` is pressing `c`,
-so every form and confirmation still applies. In a dialog, click a menu entry
+so every form and confirmation still applies. A URL (in the pipeline
+footer) opens in your browser on a single click. In a dialog, click a menu entry
 to run it, a palette entry to choose it, or a form field to focus it (toggles
 flip, choices advance). A click outside a dialog cancels it, and the wheel
 moves the selection as before.
@@ -213,6 +215,11 @@ Confirming a deploy anywhere switches to this view so you can watch it land.
 Every other action shows on its box too: "◐ clearing cache", "creating
 backup", "waking", "switching to git", then "✓ cache cleared · just now" for
 a few minutes, or "✗ creating backup failed" with the error underneath.
+Under the graph, the selected environment's URLs come first (platform
+domain and any custom domains; click one to open it, or press `v` for the
+primary), then what's waiting to deploy, then its recent commits with author
+and age.
+
 Cloning content draws an arc over the boxes from source to target
 (e.g. live → dev) with dots flowing while it copies. Actions started
 elsewhere (the dashboard, another terminal) appear from Pantheon's workflow
@@ -307,6 +314,8 @@ sites:                      # optional allowlist; empty means all sites from sit
     repo: ~/sites/acme-web
   - name: acme-intranet
     repo: ~/sites/acme-intranet
+repos:                      # local checkouts without limiting the site list
+  acme-portal: ~/sites/acme-portal
 protected_envs: [live, test] # live is always protected
 read_only: false
 deploy_defaults:
@@ -342,7 +351,7 @@ clash with yours):
 ```yaml
 customCommands:
   # Open lazyterminus focused on the environment for the checked-out branch.
-  # Uses the sites: repo mapping in lazyterminus's config to find the site.
+  # Uses the sites:/repos: mapping in lazyterminus's config to find the site.
   - key: "<c-p>"
     context: "global"
     description: "lazyterminus: open this branch's environment"

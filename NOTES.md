@@ -36,6 +36,20 @@ is run against the real account during development.
 
 ## Missing data
 
+- **Commit messages are cut at 50 characters** in `env:code-log`. A GitHub
+  merge ("Merge pull request #54 from org/branch") leaves only a few letters
+  of the PR title, so lazyterminus shows "PR #54 branch" instead of a stub,
+  and swaps in the full message from the mapped local repo when it has the
+  commit (`git log --no-walk --ignore-missing`, local only, no fetch).
+
+- **No captured `domain:list` output.** The Domain fields (`id`, `type`
+  `platform`/`custom`, `primary`, `deletable`, `status`) follow Terminus's
+  `Domain::serialize()`; `primary` and `deletable` are accepted as booleans
+  or strings. The platform URL itself comes from `env:list`'s `domain`, so it
+  works even if this guess is off. The browser is opened with `$BROWSER`,
+  else `wslview`/`explorer.exe` under WSL, `open` on macOS, `xdg-open` on
+  Linux.
+
 - **No "asleep" state anywhere.** Neither `env:info` nor `env:list` reports
   whether an environment is sleeping. The `asleep` badge therefore cannot be
   shown from Terminus data. Auto-wake instead *always* runs `env:wake`

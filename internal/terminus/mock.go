@@ -33,9 +33,6 @@ type MockRunner struct {
 	WorkflowDuration time.Duration
 	// Now is the clock; defaults to time.Now.
 	Now func() time.Time
-	// NoPause makes interactive commands exit immediately instead of
-	// waiting for enter (tests).
-	NoPause bool
 
 	mu        sync.Mutex
 	calls     []MockCall
@@ -53,6 +50,7 @@ type mockSite struct {
 	diffstat  map[string][]DiffstatEntry
 	backups   map[string][]Backup
 	upstream  []UpstreamUpdate
+	domains   map[string][]Domain // custom domains by env
 }
 
 type mockCommit struct {
@@ -82,6 +80,7 @@ type MockScenario struct {
 	WorkflowOps    map[string]string                    `json:"workflow_ops"`
 	Asleep         []string                             `json:"asleep"`
 	Upstream       map[string][]UpstreamUpdate          `json:"upstream"`
+	Domains        map[string][]Domain                  `json:"domains"` // site.env → custom domains
 	PluginCommands []json.RawMessage                    `json:"plugin_commands"`
 }
 
@@ -133,7 +132,7 @@ func (m *MockRunner) load(fsys fs.FS) error {
 	}
 	w := &mockWorld{asleep: map[string]bool{}}
 	for _, s := range sites {
-		ms := &mockSite{site: s, diffstat: map[string][]DiffstatEntry{}, backups: map[string][]Backup{}}
+		ms := &mockSite{site: s, diffstat: map[string][]DiffstatEntry{}, backups: map[string][]Backup{}, domains: map[string][]Domain{}}
 		if b, err := fs.ReadFile(fsys, "real/env_list_"+s.Name+".json"); err == nil {
 			if ms.envs, err = ParseEnvs(b); err != nil {
 				return fmt.Errorf("%s envs: %w", s.Name, err)
@@ -176,6 +175,12 @@ func (m *MockRunner) load(fsys fs.FS) error {
 		}
 		ms.upstream = sc.Upstream[s.Name]
 		w.sites = append(w.sites, ms)
+	}
+	for key, ds := range sc.Domains {
+		site, env, _ := SplitSiteEnv(key)
+		if ms := w.site(site); ms != nil {
+			ms.domains[env] = ds
+		}
 	}
 	for key, ds := range sc.Diffstat {
 		site, env, _ := SplitSiteEnv(key)
@@ -445,11 +450,8 @@ func (m *MockRunner) Stream(ctx context.Context, args ...string) (<-chan string,
 // Command implements Execer: a shell command that prints what would have run.
 func (m *MockRunner) Command(ctx context.Context, args ...string) (*exec.Cmd, error) {
 	m.record(args)
-	msg := "[mock] would run: " + Args(args).String()
-	if m.NoPause {
-		return exec.CommandContext(ctx, "sh", "-c", `printf '%s\n' "$1"`, "sh", msg), nil
-	}
-	return exec.CommandContext(ctx, "sh", "-c", `printf '%s\n\nPress enter to return to lazyterminus...' "$1"; read -r _`, "sh", msg), nil
+	// lazyterminus itself waits for Enter afterwards.
+	return exec.CommandContext(ctx, "sh", "-c", `printf '%s\n' "$1"`, "sh", "[mock] would run: "+Args(args).String()), nil
 }
 
 func (m *MockRunner) record(args []string) {
@@ -731,6 +733,13 @@ func (m *MockRunner) read(a Args, emit func(string)) ([]byte, error) {
 			emit("[warning] There are no available updates for this site.")
 		}
 		return keyed(ms.upstream, func(u UpstreamUpdate) string { return u.Hash })
+	case "domain:list":
+		ms, e, err := m.siteEnv(a, emit)
+		if err != nil {
+			return nil, err
+		}
+		ds := append([]Domain{{ID: e.Domain, Type: "platform", Status: "OK"}}, ms.domains[e.ID]...)
+		return keyed(ds, func(d Domain) string { return d.ID })
 	case "connection:info":
 		_, e, err := m.siteEnv(a, emit)
 		if err != nil {

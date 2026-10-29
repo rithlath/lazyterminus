@@ -299,6 +299,7 @@ func (m *Model) detailData() panels.DetailData {
 		d.Branch = e.ID
 		d.LocalBranch = m.localBranchStatus(site, e.ID)
 	}
+	d.Domains, d.DomainsKnown = st.domains[envID]
 	return d
 }
 
@@ -379,7 +380,7 @@ func (m Model) hintLine() (string, []hintSpan) {
 	case m.focus == panelEnvs || m.focus == panelDetail || m.showPipeline:
 		hs = []hint{{ActSelect, "actions"}, {ActDeploy, "deploy"}, {ActClearCache, "cache"}, {ActBackup, "backup"}, {ActCloneContent, "clone"},
 			{ActConnectionMode, "mode"}, {ActWake, "wake"}, {ActDrush, "drush"}, {ActCommit, "commit"},
-			{ActCreateMultidev, "new md"}, {ActDeleteMultidev, "del md"}, {ActUpstream, "upstream"}}
+			{ActCreateMultidev, "new md"}, {ActDeleteMultidev, "del md"}, {ActUpstream, "upstream"}, {ActOpenURL, "open"}}
 	default:
 		hs = []hint{{ActNextPanel, "panels"}, {ActUp, "up"}, {ActDown, "down"}, {ActSelect, "select"}, {ActRefresh, "refresh"}}
 	}
@@ -427,7 +428,7 @@ func (m Model) helpLines() []string {
 		"  "+theme.Warn.Render(theme.SymAhead+"3")+" commits ready to deploy here (multidevs: ahead of dev)   "+theme.SFTP.Render("sftp")+" on-server development",
 		"",
 		theme.Bold.Render("Mouse"),
-		"  click selects · double or right click opens the action menu · click a key hint to press it",
+		"  click selects · double or right click opens the action menu · click a key hint to press it · click a URL to open it",
 		"  "+theme.MutedText.Render("hold Shift to select and copy text"),
 		"",
 		theme.MutedText.Render("Rebind keys in "+m.cfg.Path+" under keymap: (action name → keys)."),

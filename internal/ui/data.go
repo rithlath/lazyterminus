@@ -84,7 +84,8 @@ type siteState struct {
 	drupal, drupalNote string
 	drupalLoaded       bool
 
-	branches map[string]string // multidev → local git branch status
+	branches map[string]string            // multidev → local git branch status
+	domains  map[string][]terminus.Domain // env → domain:list (nil on error)
 
 	inflight map[string]bool
 }
@@ -94,7 +95,7 @@ func newSiteState() *siteState {
 		codeLogs: map[string][]terminus.Commit{}, codeLogErr: map[string]error{},
 		diffstat: map[string][]terminus.DiffstatEntry{}, diffErr: map[string]error{},
 		ops: map[string][]terminus.WorkflowOp{}, inflight: map[string]bool{},
-		branches: map[string]string{},
+		branches: map[string]string{}, domains: map[string][]terminus.Domain{},
 	}
 }
 
@@ -158,12 +159,12 @@ func loadWorkflows(c *terminus.Client, site string, busy, force bool) tea.Cmd {
 	}
 }
 
-func loadCodeLog(c *terminus.Client, site, env string, force bool) tea.Cmd {
+func loadCodeLog(c *terminus.Client, site, env, repo string, force bool) tea.Cmd {
 	return func() tea.Msg {
 		cx, cancel := ctx()
 		defer cancel()
 		log, err := c.CodeLog(cx, site, env, force)
-		return codeLogMsg{site: site, env: env, commits: log, err: err}
+		return codeLogMsg{site: site, env: env, commits: withFullMessages(repo, log), err: err}
 	}
 }
 

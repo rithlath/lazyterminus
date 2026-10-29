@@ -37,6 +37,7 @@ const (
 	ActCreateMultidev = "create_multidev"
 	ActDeleteMultidev = "delete_multidev"
 	ActUpstream       = "upstream_updates"
+	ActOpenURL        = "open_url"
 )
 
 type binding struct {
@@ -76,6 +77,7 @@ var defaultBindings = []binding{
 	{ActCreateMultidev, []string{"n"}, "new multidev", "Environment"},
 	{ActDeleteMultidev, []string{"D"}, "delete multidev", "Environment"},
 	{ActUpstream, []string{"u"}, "upstream updates", "Environment"},
+	{ActOpenURL, []string{"v"}, "open in browser", "Environment"},
 }
 
 // KeyMap resolves key presses to actions.
