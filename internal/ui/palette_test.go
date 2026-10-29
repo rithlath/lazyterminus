@@ -117,7 +117,7 @@ func TestPaletteCloneIntoLiveBlocked(t *testing.T) {
 	h.noCalls()
 }
 
-func TestPaletteInteractiveDrush(t *testing.T) {
+func TestPaletteDrushRunsInBackground(t *testing.T) {
 	h := start(t, Options{Site: "acme-web", Env: "acme-web.dev"}, 130, 40)
 	h.waitText("[3] acme-web.dev")
 	h.keys(":")
@@ -132,6 +132,9 @@ func TestPaletteInteractiveDrush(t *testing.T) {
 	if calls[0][0] != "env:wake" || !slices.Equal(calls[1], []string{"remote:drush", "acme-web.dev", "--", "cr"}) {
 		t.Errorf("calls = %v", calls)
 	}
+	h.waitText("✓ drush cr on acme-web.dev finished")
+	h.keys("O")
+	h.waitText("[mock] remote:drush output for: cr")
 }
 
 func TestPaletteSelectOptions(t *testing.T) {

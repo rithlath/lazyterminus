@@ -451,7 +451,14 @@ func (m *MockRunner) Stream(ctx context.Context, args ...string) (<-chan string,
 func (m *MockRunner) Command(ctx context.Context, args ...string) (*exec.Cmd, error) {
 	m.record(args)
 	// lazyterminus itself waits for Enter afterwards.
-	return exec.CommandContext(ctx, "sh", "-c", `printf '%s\n' "$1"`, "sh", "[mock] would run: "+Args(args).String()), nil
+	a := Args(args)
+	if c := a.Command(); c == "remote:drush" || c == "remote:wp" {
+		// Run in the background by lazyterminus: take a moment, like SSH does.
+		out := fmt.Sprintf("[mock] %s output for: %s", c, strings.Join(a.Positionals()[1:], " "))
+		secs := fmt.Sprintf("%.2f", m.WorkflowDuration.Seconds()/2)
+		return exec.CommandContext(ctx, "sh", "-c", `sleep "$2"; printf '%s\n' "$1"`, "sh", out, secs), nil
+	}
+	return exec.CommandContext(ctx, "sh", "-c", `printf '%s\n' "$1"`, "sh", "[mock] would run: "+a.String()), nil
 }
 
 func (m *MockRunner) record(args []string) {

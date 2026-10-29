@@ -57,6 +57,7 @@ func run() error {
 
 	var base terminus.Runner = terminus.ExecRunner{Path: cfg.TerminusPath}
 	historyPath := terminus.HistoryPath(config.StateDir())
+	runsDir := filepath.Join(config.StateDir(), "runs")
 	if *mock {
 		mr, err := terminus.NewMockRunner(lazyterminus.Fixtures())
 		if err != nil {
@@ -64,10 +65,11 @@ func run() error {
 		}
 		base = mr
 		historyPath = filepath.Join(config.StateDir(), "history.mock.log")
+		runsDir = filepath.Join(config.StateDir(), "runs.mock")
 	}
 	r, dry, rec := safety.Chain(base, cfg, historyPath, *dryRun)
 
-	model := ui.New(ui.Options{Runner: r, Recorder: rec, Config: cfg, Site: *site, Env: *env, Mock: *mock, DryRun: *dryRun, HistoryLog: historyPath})
+	model := ui.New(ui.Options{Runner: r, Recorder: rec, Config: cfg, Site: *site, Env: *env, Mock: *mock, DryRun: *dryRun, HistoryLog: historyPath, RunsDir: runsDir})
 	if _, err := tea.NewProgram(model).Run(); err != nil {
 		return err
 	}

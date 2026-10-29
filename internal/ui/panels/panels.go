@@ -215,6 +215,7 @@ type DetailData struct {
 	Domains         []terminus.Domain
 	DomainsKnown    bool
 	Local           []terminus.Logged // this machine's commands here, newest first
+	OutputKey       string            // the key that opens Output
 	Err             string
 	Now             time.Time
 }
@@ -342,7 +343,7 @@ func Detail(d DetailData, width, height int) []string {
 	}
 	if len(d.Local) > 0 {
 		out = append(out, "")
-		out = append(out, LocalCommands(d.Local, terminus.SiteEnv(d.Site, e.ID), e.ID, d.Now, width)...)
+		out = append(out, LocalCommands(d.Local, terminus.SiteEnv(d.Site, e.ID), e.ID, d.OutputKey, d.Now, width)...)
 	}
 	out = append(out, "", theme.Bold.Render("Recent commits on "+e.ID+":"))
 	switch {
@@ -364,10 +365,11 @@ func Detail(d DetailData, width, height int) []string {
 }
 
 // LocalCommands renders commands this machine ran on env through
-// lazyterminus, under a heading that says they're local, not team-wide.
-func LocalCommands(cmds []terminus.Logged, siteEnv, env string, now time.Time, width int) []string {
-	out := []string{theme.Bold.Render("Your recent commands on "+env) +
-		theme.MutedText.Render(" (local history: this machine, via lazyterminus)")}
+// lazyterminus, under a heading that says they're local, not team-wide, and
+// which key shows their output.
+func LocalCommands(cmds []terminus.Logged, siteEnv, env, outputKey string, now time.Time, width int) []string {
+	out := []string{Fit(theme.Bold.Render("Your recent commands on "+env)+theme.MutedText.Render(" (this machine only) · ")+
+		theme.Key.Render(outputKey)+theme.MutedText.Render(" shows output"), width)}
 	for _, c := range cmds {
 		var sym string
 		switch {
@@ -375,6 +377,8 @@ func LocalCommands(cmds []terminus.Logged, siteEnv, env string, now time.Time, w
 			sym = theme.OK.Render(theme.SymSuccess)
 		case strings.HasPrefix(c.Result, "failed"):
 			sym = theme.Fail.Render(theme.SymFailed)
+		case c.Result == "running":
+			sym = theme.Warn.Render(theme.SymRunning)
 		case c.Result == "exec":
 			sym = theme.MutedText.Render("↗") // ran in the terminal; exit not logged
 		default:

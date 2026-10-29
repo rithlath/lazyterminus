@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -92,6 +93,12 @@ func describeStep(args []string) (stepInfo, bool) {
 		i.doing, i.done = "creating multidev "+pos[1], "created multidev "+pos[1]
 	case "multidev:delete":
 		i.doing, i.done = "deleting", "deleted"
+	case "remote:drush", "remote:wp":
+		what := strings.TrimPrefix(cmd, "remote:")
+		if k := slices.Index(args, "--"); k >= 0 && k+1 < len(args) {
+			what += " " + strings.Join(args[k+1:], " ")
+		}
+		i.doing, i.done = "running "+what, what+" done"
 	default:
 		i.doing, i.done = "running "+cmd, cmd+" done"
 	}
@@ -349,6 +356,10 @@ func (m *Model) pipelineGraph() pipeline.Graph {
 				}
 			}
 		}
+		if r := m.runOn(site, e.ID); r != nil && n.State != pipeline.Running {
+			n.State, n.Status = pipeline.Running, "running "+runWhat(r)
+			n.When = now.Sub(r.Started).Round(time.Second).String()
+		}
 		return n
 	}
 
@@ -461,6 +472,11 @@ func (m *Model) pipelineFooter(width, maxLines int) []string {
 		}
 		add(theme.Warn.Render(line))
 	}
+	if r := m.runOn(site, env); r != nil {
+		add(theme.Warn.Render(fmt.Sprintf("%s %s on %s, in the background for %s", theme.SymRunning, runWhat(r), env,
+			m.now().Sub(r.Started).Round(time.Second))) +
+			theme.MutedText.Render(fmt.Sprintf(" · keeps going if you quit · %s shows output", m.keys.Key(ActOutput))))
+	}
 	if l, ok := m.recentLanding(site, env); ok {
 		at := l.at.Local().Format("15:04")
 		switch {
@@ -493,7 +509,7 @@ func (m *Model) pipelineFooter(width, maxLines int) []string {
 	if cmds := m.localCommands(site, env, localShown); len(cmds) > 0 {
 		cmds = cmds[:min(len(cmds), max(maxLines-len(out)-3, 0))] // leave room for commits
 		if len(cmds) > 0 {
-			add(panels.LocalCommands(cmds, terminus.SiteEnv(site, env), env, m.now(), width)...)
+			add(panels.LocalCommands(cmds, terminus.SiteEnv(site, env), env, m.keys.Key(ActOutput), m.now(), width)...)
 		}
 	}
 	// The environment's own history fills what's left.

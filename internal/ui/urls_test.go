@@ -83,7 +83,7 @@ func TestLocalCommandHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := start(t, Options{Site: "acme-web", Env: "acme-web.dev", HistoryLog: path}, 140, 50)
-	h.waitText("Your recent commands on dev (local history: this machine, via lazyterminus)")
+	h.waitText("Your recent commands on dev (this machine only) · O shows output")
 	h.waitText("drush cim -y")
 	if strings.Contains(h.screen(), "drush cr") {
 		t.Error("another environment's command shown")
@@ -95,4 +95,23 @@ func TestLocalCommandHistory(t *testing.T) {
 	h.waitText("✓ just now clear cache") // logged by this session, read back
 	h.keys("p")
 	h.waitText("Your recent commands on dev")
+}
+
+func TestCopyURL(t *testing.T) {
+	copied := &opened{}
+	h := start(t, Options{Site: "acme-web", Env: "acme-web.live", Clipboard: copied.open, OpenURL: (&opened{}).open}, 140, 44)
+	h.waitText("(primary)")
+	h.keys("y")
+	h.waitText("Copied https://www.acme-web.example.com to the clipboard.")
+	if got := copied.last(); got != "https://www.acme-web.example.com" {
+		t.Errorf("copied %q", got)
+	}
+
+	h.keys("p") // right-click a URL in the pipeline copies that one
+	h.waitText("Open https://www.acme-web.example.com · https://live-acme-web.pantheonsite.io")
+	h.clickOn("Open ", "https://live-acme-web.pantheonsite.io", tea.MouseRight)
+	h.waitText("Copied https://live-acme-web.pantheonsite.io to the clipboard.")
+	if got := copied.last(); got != "https://live-acme-web.pantheonsite.io" {
+		t.Errorf("right-click copied %q", got)
+	}
 }

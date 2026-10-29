@@ -177,7 +177,7 @@ func (d *DryRun) Command(ctx context.Context, args ...string) (*exec.Cmd, error)
 		return CommandFor(d.Inner, ctx, args...)
 	}
 	msg := d.intercept(args)
-	return exec.CommandContext(ctx, "sh", "-c", `printf '%s\n\nPress enter to return to lazyterminus...' "$1"; read -r _`, "sh", msg), nil
+	return exec.CommandContext(ctx, "sh", "-c", `printf '%s\n' "$1"`, "sh", msg), nil
 }
 
 // Logged is one command from the history log, with its start and result

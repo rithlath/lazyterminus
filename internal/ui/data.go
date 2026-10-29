@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -207,8 +208,19 @@ func (m *Model) localCommands(site, env string, n int) []terminus.Logged {
 	se := terminus.SiteEnv(site, env)
 	var out []terminus.Logged
 	for i := len(m.localLog) - 1; i >= 0 && len(out) < n; i-- {
-		if m.localLog[i].Involves(se) {
-			out = append(out, m.localLog[i])
+		if l := m.localLog[i]; l.Involves(se) {
+			// A background run's result is in its run directory, not the log.
+			if r := m.runFor(l); l.Result == "exec" && r != nil {
+				switch {
+				case !r.Done:
+					l.Result = "running"
+				case r.Failed():
+					l.Result = fmt.Sprintf("failed(exit=%d)", r.ExitCode)
+				default:
+					l.Result = "ok"
+				}
+			}
+			out = append(out, l)
 		}
 	}
 	return out

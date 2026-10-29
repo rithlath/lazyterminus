@@ -135,7 +135,7 @@ monochrome terminals lose nothing:
 | `h` | command history (see below) |
 | `O` | output log (command output, tables, errors) |
 | `?` | help |
-| `q`, `ctrl+c` | quit (asks first if jobs are running) |
+| `q`, `ctrl+c` | quit (if something would be cut off, `q` asks first and says what happens to each running job) |
 
 On the selected environment:
 
@@ -147,12 +147,13 @@ On the selected environment:
 | `l` | clone content from another environment | `env:clone-content` |
 | `m` | toggle git/sftp (dev and multidevs) | `connection:set` |
 | `w` | wake | `env:wake` |
-| `x` | drush, with your terminal attached (press Enter afterwards to return) | `remote:drush` |
+| `x` | drush in the background, surviving quit (see [Background drush](#background-drush)) | `remote:drush` |
 | `o` | commit SFTP changes | `env:commit` |
 | `n` | create multidev | `multidev:create` |
 | `D` | delete multidev | `multidev:delete` |
 | `u` | upstream updates (shown in Output) | `upstream:updates:list` |
 | `v` | open in the browser (primary custom domain, else `*.pantheonsite.io`) | `domain:list` |
+| `y` | copy that URL to the clipboard (right-click a URL in the pipeline to copy that one) | — |
 
 Rebind anything in the config under `keymap:` using the action names shown in
 `?` help.
@@ -216,8 +217,8 @@ Every other action shows on its box too: "◐ clearing cache", "creating
 backup", "waking", "switching to git", then "✓ cache cleared · just now" for
 a few minutes, or "✗ creating backup failed" with the error underneath.
 Under the graph, the selected environment's URLs come first (platform
-domain and any custom domains; click one to open it, or press `v` for the
-primary), then what's waiting to deploy, then its recent commits with author
+domain and any custom domains; click one to open it or right-click to copy
+it, or press `v` to open or `y` to copy the primary), then what's waiting to deploy, then its recent commits with author
 and age.
 
 Cloning content draws an arc over the boxes from source to target
@@ -235,7 +236,7 @@ vertically. The full capture is [docs/screen-pipeline.txt](docs/screen-pipeline.
 `h` lists every Terminus command lazyterminus has run this session, newest
 first: background loads and polling as well as the commands behind actions,
 deploys and the palette. Each row has the start time, ✓/✗ (◐ while running,
-↗ for drush and other commands handed to your terminal), how long it took,
+↗ for interactive commands handed to your terminal), how long it took,
 whether it was a read or a change, and the full command; a failure shows
 Terminus's error under it. `t` cycles the time range (last 15 min, last hour,
 this session, last 5 min), `f` toggles changes only, and `h` or `esc` goes
@@ -249,9 +250,35 @@ at exit instead. Changes from earlier sessions are in the
 The Detail panel and the pipeline footer also list your last five changes
 on the selected environment, read back from that log across sessions, in
 plain words: "clear cache", "drush cim -y", "deploy …" (✓ ok, ✗ failed,
-↗ ran in your terminal, where the exit isn't logged). It's local history:
+◐ still running in the background, ↗ ran in your terminal, where the exit
+isn't logged); `O` shows this
+session's output. It's local history:
 only what this machine ran through lazyterminus, not your team's or the
 dashboard's activity; the Workflows panel has Pantheon's side.
+
+### Background drush
+
+Drush and WP-CLI (`x`, or `remote:drush`/`remote:wp` from the palette) run
+in the background so you can keep working. Unlike deploys and cache clears,
+which are Pantheon workflows that carry on whatever happens to the terminus
+that started them, drush runs over an SSH connection held open from this
+machine. So lazyterminus starts it as its own detached process: quitting
+lazyterminus doesn't cut it off.
+
+While it runs, its pipeline box shows "◐ running drush cim -y" and the
+Workflows panel lists it with "(background)"; output streams to `O`. Each
+run's output and exit code are saved under
+`$XDG_STATE_HOME/lazyterminus/runs/` (the last 50). If one finishes while
+lazyterminus is closed, the next start reports it, with its output in `O`,
+and your local history shows ✓ or ✗ for it.
+
+Nothing can answer a prompt in the background, so add `-y` to commands that
+ask (`cim -y`, `updb -y`); without it drush gets no answer and stops.
+
+Quitting with `q` asks first only when something would be cut off, and says
+what happens to each job: a Pantheon workflow keeps running, a wake step
+loses nothing but the drush after it won't start, and background drush
+keeps going.
 
 ### Auto-wake
 
@@ -304,9 +331,10 @@ commands come first with the site filled in.
 Choosing a command opens a form for its remaining arguments and options,
 built from Terminus's own definitions, and shows the full command line before
 it runs. Commands that support `--format=json` render as a table in the Output
-panel; others stream their output there. `remote:drush` and other interactive
-commands get your terminal. Palette commands go through the same safety layer
-as the keys.
+panel; others stream their output there. `remote:drush` and `remote:wp` run in
+the background like `x` does ([Background drush](#background-drush)); other interactive commands (`self:console`)
+get your terminal, and you press Enter afterwards to return. Palette commands
+go through the same safety layer as the keys.
 
 ## Configuration
 

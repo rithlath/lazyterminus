@@ -175,6 +175,9 @@ func (m Model) handleClick(msg clickMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, cmd
 	case clickURL:
+		if msg.right {
+			return m, m.copyURL(t.str)
+		}
 		return m, m.openURL(t.str)
 	case clickPipe:
 		cmd := m.selectEnv(t.str)

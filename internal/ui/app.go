@@ -15,6 +15,7 @@ import (
 	"github.com/rithlath/lazyterminus/internal/catalog"
 	"github.com/rithlath/lazyterminus/internal/config"
 	"github.com/rithlath/lazyterminus/internal/jobs"
+	"github.com/rithlath/lazyterminus/internal/runs"
 	"github.com/rithlath/lazyterminus/internal/terminus"
 	"github.com/rithlath/lazyterminus/internal/ui/panels"
 	"github.com/rithlath/lazyterminus/internal/ui/theme"
@@ -36,9 +37,13 @@ type Options struct {
 	CatalogDir string
 	// OpenURL overrides opening a URL in the browser (tests).
 	OpenURL func(url string) error
+	// Clipboard overrides the system copy tool (tests).
+	Clipboard func(s string) error
 	// HistoryLog is the history log file, read back for each environment's
 	// local command history.
 	HistoryLog string
+	// RunsDir is where background runs keep their output and exit code.
+	RunsDir string
 	// NoExecPause skips "press Enter to return" after an interactive
 	// command (tests).
 	NoExecPause bool
@@ -94,9 +99,11 @@ type Model struct {
 	output     []string
 	outputView viewport.Model
 
-	modal    modal
-	jobs     *jobs.Queue
-	afterJob map[int]func(*Model) tea.Cmd
+	modal        modal
+	jobs         *jobs.Queue
+	afterJob     map[int]func(*Model) tea.Cmd
+	afterJobWhat map[int]string // the command afterJob runs, for the quit prompt
+	runs         []*runs.Run    // background runs, oldest first
 
 	showHistory        bool
 	historyWindow      int // index into historyWindows
@@ -134,8 +141,8 @@ func New(opts Options) Model {
 		outputView: viewport.New(),
 		status:     "Loading sites…",
 		jobs:       jobs.New(opts.Runner),
-		afterJob:   map[int]func(*Model) tea.Cmd{},
-		landed:     map[string]map[string]landing{},
+		afterJob:   map[int]func(*Model) tea.Cmd{}, afterJobWhat: map[int]string{},
+		landed: map[string]map[string]landing{},
 	}
 	m.started = m.now()
 	m.jobs.Now = m.now
@@ -160,7 +167,7 @@ func (m *Model) now() time.Time {
 func (m Model) Init() tea.Cmd {
 	// The catalog loads in the background at startup so ":" opens instantly.
 	return tea.Batch(checkAuth(m.client), loadSites(m.client, false), m.spinner.Tick, clockTick(),
-		loadCatalog(m.opts.Runner, m.catalogDir(), false), loadLocalLog(m.opts.HistoryLog))
+		loadCatalog(m.opts.Runner, m.catalogDir(), false), loadLocalLog(m.opts.HistoryLog), loadRuns(m.opts.RunsDir))
 }
 
 // ---- selection helpers ----------------------------------------------------
@@ -270,7 +277,7 @@ func (m *Model) envRow(site string, st *siteState, e terminus.Env) panels.EnvRow
 // busy reports whether anything is loading or running, which drives the
 // spinner and the faster poll interval.
 func (m *Model) busy() bool {
-	if len(m.jobs.Running()) > 0 {
+	if len(m.jobs.Running()) > 0 || len(m.runningRuns()) > 0 {
 		return true
 	}
 	for _, st := range m.data {
@@ -524,7 +531,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.onAnim()
 
 	case clockMsg:
-		return m, clockTick() // re-render relative times
+		return m, tea.Batch(clockTick(), m.pollRuns()) // re-render relative times
+
+	case runsLoadedMsg:
+		m.onRunsLoaded(msg)
+		return m, tea.Batch(m.startSpinner(), m.startAnim())
 
 	case sitesLoadedMsg:
 		m.sitesLoaded = true
@@ -664,6 +675,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.onOpened(msg)
 		return m, nil
 
+	case copiedMsg:
+		m.onCopied(msg)
+		return m, nil
+
 	case drupalMsg:
 		st := m.state(msg.site)
 		delete(st.inflight, "drupal")
@@ -761,10 +776,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	switch action := m.keys.Action(k); action {
 	case ActQuit:
-		if n := len(m.jobs.Running()); n > 0 && k != "ctrl+c" {
-			m.modal = &promptModal{title: "Quit", question: fmt.Sprintf(
-				"%d job(s) still running. Quitting stops the local terminus process; Pantheon workflows already started keep running. Quit anyway?", n),
-				onYes: func(m *Model) tea.Cmd { m.jobs.CancelAll(); return tea.Quit }}
+		if lines, ask := m.quitPrompt(); ask && k != "ctrl+c" {
+			m.modal = &promptModal{title: "Quit", question: "Still running. If you quit now:", detail: lines,
+				outro: "Quit anyway?", onYes: func(m *Model) tea.Cmd { m.jobs.CancelAll(); return tea.Quit }}
 			return m, nil
 		}
 		m.jobs.CancelAll()
@@ -774,6 +788,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.runAction(action)
 	case ActOpenURL:
 		return m, m.openEnvURL()
+	case ActCopyURL:
+		return m, m.copyEnvURL()
 	case ActHelp:
 		m.showHelp = true
 	case ActOutput:

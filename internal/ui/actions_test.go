@@ -2,6 +2,7 @@ package ui
 
 import (
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -299,7 +300,7 @@ func TestDeleteMultidevOnlyOnMultidevs(t *testing.T) {
 	h.noCalls()
 }
 
-func TestDrushWakesThenExecs(t *testing.T) {
+func TestDrushRunsInBackground(t *testing.T) {
 	h := start(t, Options{Site: "acme-web", Env: "acme-web.proj-19"}, 130, 40)
 	h.waitText("[3] acme-web.proj-19")
 	h.keys("x")
@@ -318,7 +319,10 @@ func TestDrushWakesThenExecs(t *testing.T) {
 	if !slices.Equal(calls[1], want) {
 		t.Errorf("drush = %q", calls[1])
 	}
-	h.waitText("exited")
+	// The UI stays usable while it runs, and the result lands in Output.
+	h.waitText("✓ drush cget system.site name --format=\"json\" on acme-web.proj-19 finished")
+	h.keys("O")
+	h.waitText("[mock] remote:drush output for: cget system.site name --format=json")
 }
 
 func TestBackupForm(t *testing.T) {
@@ -386,9 +390,33 @@ func TestQuitWithRunningJobAsks(t *testing.T) {
 	h.keys("c", "y")
 	h.waitText("Clear cache on acme-web.dev · job")
 	h.keys("q")
-	h.waitText("1 job(s) still running")
+	h.waitText("Clear cache on acme-web.dev: env:clear-cache keeps running on Pantheon")
 	h.keys("n")
-	h.waitFor("prompt closed", func(s string) bool { return !strings.Contains(s, "still running") })
+	h.waitFor("prompt closed", func(s string) bool { return !strings.Contains(s, "Still running") })
+}
+
+func TestBackgroundDrushSurvivesQuit(t *testing.T) {
+	runsDir, histLog := filepath.Join(t.TempDir(), "runs"), filepath.Join(t.TempDir(), "history.log")
+	mock := testMock(t)
+	mock.WorkflowDuration = 1500 * time.Millisecond // drush "takes" 0.75s
+	h := startWith(t, mock, Options{Site: "acme-web", Env: "acme-web.proj-19", RunsDir: runsDir, HistoryLog: histLog}, false, 140, 40)
+	h.waitText("[3] acme-web.proj-19")
+	h.keys("x")
+	h.typeText("updb -y")
+	h.keys("enter")
+	h.waitText("Run it? y/n")
+	h.keys("y")
+	h.waitText("Started in the background: drush updb -y on acme-web.proj-19")
+	h.keys("q") // nothing a quit would cut off, so no prompt
+	h.final()
+
+	time.Sleep(time.Second) // it finishes while lazyterminus is closed
+	h2 := startWith(t, testMock(t), Options{Site: "acme-web", Env: "acme-web.proj-19", RunsDir: runsDir, HistoryLog: histLog}, false, 140, 40)
+	h2.waitText("1 background command finished while lazyterminus was closed")
+	h2.waitText("✓ just now drush updb -y") // its result in the local history
+	h2.keys("O")
+	h2.waitText("[mock] remote:drush output for: updb -y")
+	h2.waitText("(ran while lazyterminus was closed)")
 }
 
 func TestSplitWords(t *testing.T) {

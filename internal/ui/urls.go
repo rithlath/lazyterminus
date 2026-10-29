@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"runtime"
@@ -22,6 +23,10 @@ type (
 	openedMsg struct {
 		url string
 		err error
+	}
+	copiedMsg struct {
+		url string
+		err error // nil: copied with a system tool; else only sent to the terminal
 	}
 )
 
@@ -120,6 +125,71 @@ func (m *Model) onOpened(msg openedMsg) {
 	m.setStatus("Opened "+msg.url+" in your browser.", false)
 }
 
+// copyEnvURL copies the selected environment's main URL (the one the open
+// key opens).
+func (m *Model) copyEnvURL() tea.Cmd {
+	site, e, ok := m.target()
+	if !ok {
+		return nil
+	}
+	urls := m.envURLs(site, e.ID)
+	if len(urls) == 0 {
+		m.setStatus(e.ID+" has no domain yet.", true)
+		return nil
+	}
+	return m.copyURL(urls[0])
+}
+
+// copyURL puts url on the clipboard two ways: OSC 52 through the terminal,
+// and the system's copy tool, since tmux or the terminal may not pass OSC
+// 52 on.
+func (m *Model) copyURL(url string) tea.Cmd {
+	cp := m.opts.Clipboard
+	if cp == nil {
+		cp = systemClipboard
+	}
+	return tea.Batch(tea.SetClipboard(url), func() tea.Msg { return copiedMsg{url: url, err: cp(url)} })
+}
+
+func (m *Model) onCopied(msg copiedMsg) {
+	if msg.err != nil {
+		m.setStatus("Sent "+msg.url+" to the terminal's clipboard (no copy tool worked: "+msg.err.Error()+")", false)
+		return
+	}
+	m.setStatus("Copied "+msg.url+" to the clipboard.", false)
+}
+
+// systemClipboard copies s with the platform's tool: clip.exe under WSL,
+// pbcopy on macOS, wl-copy, xclip or xsel elsewhere.
+func systemClipboard(s string) error {
+	var tools [][]string
+	switch {
+	case runtime.GOOS == "darwin":
+		tools = [][]string{{"pbcopy"}}
+	case os.Getenv("WSL_DISTRO_NAME") != "" || os.Getenv("WSL_INTEROP") != "":
+		tools = [][]string{{"clip.exe"}}
+	default:
+		if os.Getenv("WAYLAND_DISPLAY") != "" {
+			tools = append(tools, []string{"wl-copy"})
+		}
+		if os.Getenv("DISPLAY") != "" {
+			tools = append(tools, []string{"xclip", "-selection", "clipboard"}, []string{"xsel", "--clipboard", "--input"})
+		}
+	}
+	err := errors.New("no clipboard tool found")
+	for _, t := range tools {
+		if _, lerr := exec.LookPath(t[0]); lerr != nil {
+			continue
+		}
+		c := exec.Command(t[0], t[1:]...)
+		c.Stdin = strings.NewReader(s)
+		if err = c.Run(); err == nil {
+			return nil
+		}
+	}
+	return err
+}
+
 // openBrowser hands url to the system: $BROWSER if set, wslview or
 // explorer.exe under WSL, open on macOS, xdg-open elsewhere. It doesn't
 // wait for the browser.
@@ -198,7 +268,7 @@ func (m *Model) urlLine(width int) (string, []urlSpan) {
 		x = start + w
 	}
 	if k := m.keys.Key(ActOpenURL); k != "" && k != "—" {
-		line += theme.MutedText.Render("   " + k + " or click to open")
+		line += theme.MutedText.Render("   " + k + " or click to open · " + m.keys.Key(ActCopyURL) + " or right-click to copy")
 	}
 	return line, spans
 }
