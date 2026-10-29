@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -57,6 +58,9 @@ type (
 		account string
 		err     error
 	}
+	localLogMsg struct {
+		entries []terminus.Logged
+	}
 	clockMsg time.Time
 	errMsg   struct {
 		context string
@@ -84,7 +88,8 @@ type siteState struct {
 	drupal, drupalNote string
 	drupalLoaded       bool
 
-	branches map[string]string // multidev → local git branch status
+	branches map[string]string            // multidev → local git branch status
+	domains  map[string][]terminus.Domain // env → domain:list (nil on error)
 
 	inflight map[string]bool
 }
@@ -94,7 +99,7 @@ func newSiteState() *siteState {
 		codeLogs: map[string][]terminus.Commit{}, codeLogErr: map[string]error{},
 		diffstat: map[string][]terminus.DiffstatEntry{}, diffErr: map[string]error{},
 		ops: map[string][]terminus.WorkflowOp{}, inflight: map[string]bool{},
-		branches: map[string]string{},
+		branches: map[string]string{}, domains: map[string][]terminus.Domain{},
 	}
 }
 
@@ -158,12 +163,12 @@ func loadWorkflows(c *terminus.Client, site string, busy, force bool) tea.Cmd {
 	}
 }
 
-func loadCodeLog(c *terminus.Client, site, env string, force bool) tea.Cmd {
+func loadCodeLog(c *terminus.Client, site, env, repo string, force bool) tea.Cmd {
 	return func() tea.Msg {
 		cx, cancel := ctx()
 		defer cancel()
 		log, err := c.CodeLog(cx, site, env, force)
-		return codeLogMsg{site: site, env: env, commits: log, err: err}
+		return codeLogMsg{site: site, env: env, commits: withFullMessages(repo, log), err: err}
 	}
 }
 
@@ -183,6 +188,42 @@ func loadOps(c *terminus.Client, site, id string, finished bool) tea.Cmd {
 		ops, err := c.WorkflowOps(cx, site, id, finished)
 		return opsMsg{site: site, id: id, ops: ops, err: err}
 	}
+}
+
+// loadLocalLog reads the history log (commands this machine ran through
+// lazyterminus). A missing log is an empty history.
+func loadLocalLog(path string) tea.Cmd {
+	if path == "" {
+		return nil
+	}
+	return func() tea.Msg {
+		b, _ := os.ReadFile(path)
+		return localLogMsg{entries: terminus.ParseHistoryLog(b)}
+	}
+}
+
+// localCommands returns the newest n logged commands naming site.env,
+// newest first.
+func (m *Model) localCommands(site, env string, n int) []terminus.Logged {
+	se := terminus.SiteEnv(site, env)
+	var out []terminus.Logged
+	for i := len(m.localLog) - 1; i >= 0 && len(out) < n; i-- {
+		if l := m.localLog[i]; l.Involves(se) {
+			// A background run's result is in its run directory, not the log.
+			if r := m.runFor(l); l.Result == "exec" && r != nil {
+				switch {
+				case !r.Done:
+					l.Result = "running"
+				case r.Failed():
+					l.Result = fmt.Sprintf("failed(exit=%d)", r.ExitCode)
+				default:
+					l.Result = "ok"
+				}
+			}
+			out = append(out, l)
+		}
+	}
+	return out
 }
 
 func loadDrupal(site, repo string) tea.Cmd {

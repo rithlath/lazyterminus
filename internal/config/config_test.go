@@ -140,3 +140,30 @@ func TestConfigDirMovesOldName(t *testing.T) {
 		t.Errorf("old dir still present: %v", err)
 	}
 }
+
+func TestReposMapsWithoutAllowlisting(t *testing.T) {
+	home, _ := os.UserHomeDir()
+	cfg, err := Parse([]byte("sites:\n  - name: acme-web\n    repo: ~/a\nrepos:\n  acme-web: ~/ignored\n  one-rta: ~/onerta\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.RepoFor("one-rta"); got != filepath.Join(home, "onerta") {
+		t.Errorf("repos: RepoFor = %q", got)
+	}
+	if got := cfg.RepoFor("acme-web"); got != filepath.Join(home, "a") {
+		t.Errorf("sites: repo should win, got %q", got)
+	}
+	if !cfg.Allowed("acme-web") || cfg.Allowed("one-rta") {
+		t.Error("repos: must not change the allowlist")
+	}
+	open, _ := Parse([]byte("repos:\n  one-rta: ~/onerta\n"))
+	if !open.Allowed("anything") {
+		t.Error("repos: alone must allow every site")
+	}
+
+	root := t.TempDir()
+	cfg = Config{Repos: map[string]string{"one-rta": root}}
+	if got := cfg.SiteForDir(filepath.Join(root)); got != "one-rta" {
+		t.Errorf("SiteForDir via repos: = %q", got)
+	}
+}

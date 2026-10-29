@@ -6,9 +6,11 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // Site is one row of `site:list --format=json` (also `site:info`).
@@ -86,6 +88,46 @@ func (c Commit) LabelSet() map[string]bool {
 func (c Commit) Time() time.Time {
 	t, _ := time.Parse("2006-01-02T15:04:05", c.Datetime)
 	return t
+}
+
+// CodeLogMessageMax is where Pantheon's code log cuts commit messages off.
+const CodeLogMessageMax = 50
+
+// mergePR matches GitHub's merge commit header; the PR title follows it.
+var mergePR = regexp.MustCompile(`^Merge pull request #(\d+) from (\S+)(.*)$`)
+
+// Subject is the line worth showing for a commit: the first line, or for a
+// GitHub merge, the PR title with its number ("ICare feedback form (#54)").
+// The body may come with its newlines or flattened into spaces, so a double
+// space ends the title too. When Pantheon's cutoff leaves only a stub of
+// the title, the branch name says more: "PR #53 vendor-updates".
+func (c Commit) Subject() string {
+	msg := strings.TrimSpace(c.Message)
+	cut := utf8.RuneCountInString(c.Message) == CodeLogMessageMax || len(c.Message) == CodeLogMessageMax
+	flat := strings.ReplaceAll(msg, "\n", "  ")
+	if m := mergePR.FindStringSubmatch(flat); m != nil {
+		num, branch, rest := m[1], m[2], strings.TrimSpace(m[3])
+		if _, b, ok := strings.Cut(branch, "/"); ok {
+			branch = b
+		}
+		title, _, _ := strings.Cut(rest, "  ")
+		title = strings.TrimSpace(title)
+		complete := !cut || strings.Contains(rest, "  ")
+		switch {
+		case title != "" && complete:
+			return title + " (#" + num + ")"
+		case title == "" && cut:
+			return "PR #" + num + " " + branch + "…"
+		case utf8.RuneCountInString(title) >= 4:
+			return "PR #" + num + " " + branch + ": " + title + "…"
+		}
+		return "PR #" + num + " " + branch
+	}
+	first, _, multi := strings.Cut(msg, "\n")
+	if cut && !multi {
+		first += "…"
+	}
+	return strings.TrimSpace(first)
 }
 
 // DiffstatEntry is one row of `env:diffstat --format=json`.
@@ -202,4 +244,68 @@ func (f *FlexInt) UnmarshalJSON(b []byte) error {
 	}
 	*f = FlexInt(n)
 	return nil
+}
+
+// Domain is one row of `domain:list --fields=* --format=json`. Type is
+// "platform" for the *.pantheonsite.io domain and "custom" for added ones.
+// The shape is from Terminus's Domain::serialize(); no real capture yet.
+type Domain struct {
+	ID        string   `json:"id"`
+	Type      string   `json:"type"`
+	Status    string   `json:"status,omitempty"`
+	Primary   FlexBool `json:"primary"`
+	Deletable FlexBool `json:"deletable"`
+}
+
+// FlexBool accepts a JSON boolean, a "true"/"false" or "1"/"0" string, or
+// null.
+type FlexBool bool
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (f *FlexBool) UnmarshalJSON(b []byte) error {
+	switch strings.ToLower(string(bytes.Trim(b, `"`))) {
+	case "true", "1", "yes":
+		*f = true
+	default:
+		*f = false
+	}
+	return nil
+}
+
+// URL is the https address of a domain or hostname.
+func URL(host string) string {
+	if host == "" {
+		return ""
+	}
+	return "https://" + host
+}
+
+// CustomDomains returns domains that aren't Pantheon's platform domain,
+// primary first, then in Terminus's order.
+func CustomDomains(ds []Domain) []Domain {
+	var out []Domain
+	for _, d := range ds {
+		if d.Type != "platform" && !strings.HasSuffix(d.ID, ".pantheonsite.io") {
+			out = append(out, d)
+		}
+	}
+	for i, d := range out {
+		if d.Primary && i > 0 {
+			copy(out[1:i+1], out[:i])
+			out[0] = d
+			break
+		}
+	}
+	return out
+}
+
+// PrimaryURL is the address to open for an environment: its primary custom
+// domain when one is set, else the platform domain.
+func PrimaryURL(e Env, ds []Domain) string {
+	for _, d := range ds {
+		if d.Primary && d.ID != "" {
+			return URL(d.ID)
+		}
+	}
+	return URL(e.Domain)
 }

@@ -12,6 +12,12 @@
             "feedback": {"connection_mode": "sftp"}
         }
     },
+    "domains": {
+        "acme-web.live": [
+            {"id": "acme-web.example.com", "type": "custom", "status": "OK", "primary": false, "deletable": true},
+            {"id": "www.acme-web.example.com", "type": "custom", "status": "OK", "primary": true, "deletable": true}
+        ]
+    },
     "diffstat": {
         "acme-web.feedback": [
             {"file": "web/modules/custom/rta_cx/rta_cx.module", "status": "M", "deletions": 3, "additions": 41},

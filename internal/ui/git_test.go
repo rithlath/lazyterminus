@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/rithlath/lazyterminus/internal/config"
+	"github.com/rithlath/lazyterminus/internal/terminus"
 )
 
 // gitRepo creates a repo with a Pantheon-looking remote and branches:
@@ -116,4 +117,31 @@ func TestLazygitKey(t *testing.T) {
 	}
 	h2.waitFor("refresh after lazygit", func(string) bool { return len(h2.mock.Calls()) > before })
 	h2.noCalls()
+}
+
+func TestWithFullMessages(t *testing.T) {
+	repo := gitRepo(t)
+	out, err := exec.Command("git", "-C", repo, "log", "-1", "--format=%H", "ahead").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	head := strings.TrimSpace(string(out))
+	missing := strings.Repeat("0", 40)
+	log := []terminus.Commit{
+		{Hash: head, Message: "Merge pull request #54 from kalamuna/icaree  ICare"},
+		{Hash: missing, Message: "Merge pull request #53 from kalamuna/vendor-upd  V"},
+	}
+	got := withFullMessages(repo, log)
+	if got[0].Message == log[0].Message || got[0].Message == "" {
+		t.Errorf("local commit kept Pantheon's message: %q", got[0].Message)
+	}
+	if got[1].Message != log[1].Message {
+		t.Errorf("commit missing locally changed: %q", got[1].Message)
+	}
+	if log[0].Message != "Merge pull request #54 from kalamuna/icaree  ICare" {
+		t.Error("input slice modified")
+	}
+	if g := withFullMessages("", log); g[0].Message != log[0].Message {
+		t.Error("no repo should change nothing")
+	}
 }

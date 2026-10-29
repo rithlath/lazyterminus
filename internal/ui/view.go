@@ -299,6 +299,8 @@ func (m *Model) detailData() panels.DetailData {
 		d.Branch = e.ID
 		d.LocalBranch = m.localBranchStatus(site, e.ID)
 	}
+	d.Domains, d.DomainsKnown = st.domains[envID]
+	d.Local, d.OutputKey = m.localCommands(site, envID, localShown), m.keys.Key(ActOutput)
 	return d
 }
 
@@ -318,6 +320,17 @@ func (m *Model) jobRows() []panels.JobRow {
 			r.Err = j.Err.Error()
 		}
 		rows = append(rows, r)
+	}
+	for i := len(m.runs) - 1; i >= 0; i-- { // newest first
+		r := m.runs[i]
+		if r.Site != m.site() || r.Done && m.now().Sub(r.Ended) > recentRunFor {
+			continue
+		}
+		row := panels.JobRow{Title: r.Title + " (background)", Running: !r.Done, Failed: r.Failed(), Started: r.Started, Ended: r.Ended}
+		if r.Failed() {
+			row.Err = fmt.Sprintf("exit %d", r.ExitCode)
+		}
+		rows = append(rows, row)
 	}
 	return rows
 }
@@ -379,7 +392,7 @@ func (m Model) hintLine() (string, []hintSpan) {
 	case m.focus == panelEnvs || m.focus == panelDetail || m.showPipeline:
 		hs = []hint{{ActSelect, "actions"}, {ActDeploy, "deploy"}, {ActClearCache, "cache"}, {ActBackup, "backup"}, {ActCloneContent, "clone"},
 			{ActConnectionMode, "mode"}, {ActWake, "wake"}, {ActDrush, "drush"}, {ActCommit, "commit"},
-			{ActCreateMultidev, "new md"}, {ActDeleteMultidev, "del md"}, {ActUpstream, "upstream"}}
+			{ActCreateMultidev, "new md"}, {ActDeleteMultidev, "del md"}, {ActUpstream, "upstream"}, {ActOpenURL, "open"}, {ActCopyURL, "copy url"}}
 	default:
 		hs = []hint{{ActNextPanel, "panels"}, {ActUp, "up"}, {ActDown, "down"}, {ActSelect, "select"}, {ActRefresh, "refresh"}}
 	}
@@ -427,7 +440,7 @@ func (m Model) helpLines() []string {
 		"  "+theme.Warn.Render(theme.SymAhead+"3")+" commits ready to deploy here (multidevs: ahead of dev)   "+theme.SFTP.Render("sftp")+" on-server development",
 		"",
 		theme.Bold.Render("Mouse"),
-		"  click selects · double or right click opens the action menu · click a key hint to press it",
+		"  click selects · double or right click opens the action menu · click a key hint to press it · click a URL to open it, right-click to copy it",
 		"  "+theme.MutedText.Render("hold Shift to select and copy text"),
 		"",
 		theme.MutedText.Render("Rebind keys in "+m.cfg.Path+" under keymap: (action name → keys)."),

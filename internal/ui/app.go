@@ -15,6 +15,7 @@ import (
 	"github.com/rithlath/lazyterminus/internal/catalog"
 	"github.com/rithlath/lazyterminus/internal/config"
 	"github.com/rithlath/lazyterminus/internal/jobs"
+	"github.com/rithlath/lazyterminus/internal/runs"
 	"github.com/rithlath/lazyterminus/internal/terminus"
 	"github.com/rithlath/lazyterminus/internal/ui/panels"
 	"github.com/rithlath/lazyterminus/internal/ui/theme"
@@ -34,6 +35,18 @@ type Options struct {
 	Now func() time.Time
 	// CatalogDir overrides where the command catalog is cached (tests).
 	CatalogDir string
+	// OpenURL overrides opening a URL in the browser (tests).
+	OpenURL func(url string) error
+	// Clipboard overrides the system copy tool (tests).
+	Clipboard func(s string) error
+	// HistoryLog is the history log file, read back for each environment's
+	// local command history.
+	HistoryLog string
+	// RunsDir is where background runs keep their output and exit code.
+	RunsDir string
+	// NoExecPause skips "press Enter to return" after an interactive
+	// command (tests).
+	NoExecPause bool
 }
 
 // Panel identifiers, in tab order.
@@ -86,9 +99,11 @@ type Model struct {
 	output     []string
 	outputView viewport.Model
 
-	modal    modal
-	jobs     *jobs.Queue
-	afterJob map[int]func(*Model) tea.Cmd
+	modal        modal
+	jobs         *jobs.Queue
+	afterJob     map[int]func(*Model) tea.Cmd
+	afterJobWhat map[int]string // the command afterJob runs, for the quit prompt
+	runs         []*runs.Run    // background runs, oldest first
 
 	showHistory        bool
 	historyWindow      int // index into historyWindows
@@ -100,6 +115,8 @@ type Model struct {
 	animating    bool
 	landed       map[string]map[string]landing
 	started      time.Time
+
+	localLog []terminus.Logged // the history log, oldest first
 
 	catalog         *catalog.Catalog
 	catalogLoading  bool
@@ -124,8 +141,8 @@ func New(opts Options) Model {
 		outputView: viewport.New(),
 		status:     "Loading sites…",
 		jobs:       jobs.New(opts.Runner),
-		afterJob:   map[int]func(*Model) tea.Cmd{},
-		landed:     map[string]map[string]landing{},
+		afterJob:   map[int]func(*Model) tea.Cmd{}, afterJobWhat: map[int]string{},
+		landed: map[string]map[string]landing{},
 	}
 	m.started = m.now()
 	m.jobs.Now = m.now
@@ -150,7 +167,7 @@ func (m *Model) now() time.Time {
 func (m Model) Init() tea.Cmd {
 	// The catalog loads in the background at startup so ":" opens instantly.
 	return tea.Batch(checkAuth(m.client), loadSites(m.client, false), m.spinner.Tick, clockTick(),
-		loadCatalog(m.opts.Runner, m.catalogDir(), false))
+		loadCatalog(m.opts.Runner, m.catalogDir(), false), loadLocalLog(m.opts.HistoryLog), loadRuns(m.opts.RunsDir))
 }
 
 // ---- selection helpers ----------------------------------------------------
@@ -260,7 +277,7 @@ func (m *Model) envRow(site string, st *siteState, e terminus.Env) panels.EnvRow
 // busy reports whether anything is loading or running, which drives the
 // spinner and the faster poll interval.
 func (m *Model) busy() bool {
-	if len(m.jobs.Running()) > 0 {
+	if len(m.jobs.Running()) > 0 || len(m.runningRuns()) > 0 {
 		return true
 	}
 	for _, st := range m.data {
@@ -317,7 +334,7 @@ func (m *Model) ensureEnvData(site string, force bool) tea.Cmd {
 	var cmds []tea.Cmd
 	need := func(env string) {
 		if _, ok := st.codeLogs[env]; (force || !ok) && st.begin("codelog:"+env) {
-			cmds = append(cmds, loadCodeLog(m.client, site, env, force))
+			cmds = append(cmds, loadCodeLog(m.client, site, env, m.cfg.RepoFor(site), force))
 		}
 	}
 	need("dev")
@@ -482,7 +499,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.client.InvalidateSite(msg.site)
 		m.state(msg.site).inflight = map[string]bool{}
-		return m, m.ensureSite(msg.site, true)
+		return m, tea.Batch(m.ensureSite(msg.site, true), loadLocalLog(m.opts.HistoryLog))
+
+	case localLogMsg:
+		m.localLog = msg.entries
+		return m, nil
 
 	case spinner.TickMsg:
 		if !m.busy() {
@@ -510,7 +531,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.onAnim()
 
 	case clockMsg:
-		return m, clockTick() // re-render relative times
+		return m, tea.Batch(clockTick(), m.pollRuns()) // re-render relative times
+
+	case runsLoadedMsg:
+		m.onRunsLoaded(msg)
+		return m, tea.Batch(m.startSpinner(), m.startAnim())
 
 	case sitesLoadedMsg:
 		m.sitesLoaded = true
@@ -575,7 +600,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.restoreEnvCursor(prevEnv)
-		return m, tea.Batch(m.ensureEnvData(msg.site, false), m.ensureOps(msg.site), m.ensureBranch())
+		return m, tea.Batch(m.ensureEnvData(msg.site, false), m.ensureOps(msg.site), m.ensureBranch(), m.ensureDomains())
 
 	case workflowsMsg:
 		st := m.state(msg.site)
@@ -640,6 +665,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		st.ops[msg.id] = msg.ops
+		return m, nil
+
+	case domainsMsg:
+		m.onDomains(msg)
+		return m, nil
+
+	case openedMsg:
+		m.onOpened(msg)
+		return m, nil
+
+	case copiedMsg:
+		m.onCopied(msg)
 		return m, nil
 
 	case drupalMsg:
@@ -739,10 +776,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	switch action := m.keys.Action(k); action {
 	case ActQuit:
-		if n := len(m.jobs.Running()); n > 0 && k != "ctrl+c" {
-			m.modal = &promptModal{title: "Quit", question: fmt.Sprintf(
-				"%d job(s) still running. Quitting stops the local terminus process; Pantheon workflows already started keep running. Quit anyway?", n),
-				onYes: func(m *Model) tea.Cmd { m.jobs.CancelAll(); return tea.Quit }}
+		if lines, ask := m.quitPrompt(); ask && k != "ctrl+c" {
+			m.modal = &promptModal{title: "Quit", question: "Still running. If you quit now:", detail: lines,
+				outro: "Quit anyway?", onYes: func(m *Model) tea.Cmd { m.jobs.CancelAll(); return tea.Quit }}
 			return m, nil
 		}
 		m.jobs.CancelAll()
@@ -750,6 +786,10 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case ActDeploy, ActClearCache, ActBackup, ActCloneContent, ActConnectionMode, ActWake,
 		ActDrush, ActCommit, ActCreateMultidev, ActDeleteMultidev, ActUpstream:
 		return m, m.runAction(action)
+	case ActOpenURL:
+		return m, m.openEnvURL()
+	case ActCopyURL:
+		return m, m.copyEnvURL()
 	case ActHelp:
 		m.showHelp = true
 	case ActOutput:
@@ -807,7 +847,7 @@ func (m Model) move(delta int) (tea.Model, tea.Cmd) {
 		rows := m.envRows()
 		m.envList.Move(selectable(rows), delta)
 		m.detailOffset = 0
-		return m, tea.Batch(m.ensureOps(m.site()), m.ensureBranch())
+		return m, tea.Batch(m.ensureOps(m.site()), m.ensureBranch(), m.ensureDomains())
 	case panelDetail:
 		m.detailOffset = max(m.detailOffset+delta, 0)
 	case panelWorkflows:
@@ -838,6 +878,7 @@ func (m *Model) refresh() tea.Cmd {
 		st := m.state(site)
 		st.inflight = map[string]bool{}
 		st.codeLogs, st.diffstat = map[string][]terminus.Commit{}, map[string][]terminus.DiffstatEntry{}
+		st.domains = map[string][]terminus.Domain{}
 		return tea.Batch(m.ensureSite(site, true), m.startSpinner())
 	case panelDetail:
 		env := m.selectedEnv()
@@ -848,16 +889,17 @@ func (m *Model) refresh() tea.Cmd {
 		m.client.InvalidateEnv(site, env)
 		var cmds []tea.Cmd
 		if st.begin("codelog:" + env) {
-			cmds = append(cmds, loadCodeLog(m.client, site, env, true))
+			cmds = append(cmds, loadCodeLog(m.client, site, env, m.cfg.RepoFor(site), true))
 		}
 		if src := terminus.SourceEnv(env); src != "" && st.begin("codelog:"+src) {
-			cmds = append(cmds, loadCodeLog(m.client, site, src, true))
+			cmds = append(cmds, loadCodeLog(m.client, site, src, m.cfg.RepoFor(site), true))
 		}
 		if e := st.env(env); e != nil && e.ConnectionMode == "sftp" && st.begin("diffstat:"+env) {
 			cmds = append(cmds, loadDiffstat(m.client, site, env, true))
 		}
+		delete(st.domains, env)
 		st.drupalLoaded = false
-		cmds = append(cmds, m.ensureSite(site, false), m.startSpinner())
+		cmds = append(cmds, m.ensureSite(site, false), m.ensureDomains(), m.startSpinner())
 		return tea.Batch(cmds...)
 	case panelWorkflows:
 		if site == "" {

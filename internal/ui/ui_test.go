@@ -25,7 +25,6 @@ func testMock(t *testing.T) *terminus.MockRunner {
 	}
 	m.MinLatency, m.MaxLatency = 0, 0
 	m.WorkflowDuration = 150 * time.Millisecond
-	m.NoPause = true
 	return m
 }
 
@@ -81,8 +80,15 @@ func startWith(t *testing.T, mock *terminus.MockRunner, opts Options, dryRun boo
 		opts.Config = testConfig()
 	}
 	var dry *terminus.DryRun
-	opts.Runner, dry, opts.Recorder = safety.Chain(mock, opts.Config, filepath.Join(t.TempDir(), "history.log"), dryRun)
+	if opts.HistoryLog == "" {
+		opts.HistoryLog = filepath.Join(t.TempDir(), "history.log")
+	}
+	opts.Runner, dry, opts.Recorder = safety.Chain(mock, opts.Config, opts.HistoryLog, dryRun)
 	opts.DryRun = dryRun
+	opts.NoExecPause = true
+	if opts.RunsDir == "" {
+		opts.RunsDir = filepath.Join(t.TempDir(), "runs")
+	}
 	if opts.CatalogDir == "" {
 		opts.CatalogDir = t.TempDir()
 	}

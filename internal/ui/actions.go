@@ -1,9 +1,13 @@
 package ui
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"os"
+	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -87,12 +91,12 @@ func wakeSteps(site string, envs ...string) [][]string {
 }
 
 // confirmAndRun opens the confirmation modal for steps and, once approved,
-// runs them as a background job. If interactive is set it runs last with
-// the real terminal (tea.ExecProcess) after the job succeeds.
-func (m *Model) confirmAndRun(title, site, env string, steps [][]string, interactive []string, sctx safety.Context, warnings []string) tea.Cmd {
+// runs them as a background job. If last is set it runs after the job
+// succeeds, outside the job queue.
+func (m *Model) confirmAndRun(title, site, env string, steps [][]string, last *final, sctx safety.Context, warnings []string) tea.Cmd {
 	all := steps
-	if interactive != nil {
-		all = append(append([][]string{}, steps...), interactive)
+	if last != nil {
+		all = append(append([][]string{}, steps...), last.args)
 	}
 	if d := m.policy().EvaluatePlan(all, sctx); d.Level == safety.Blocked {
 		m.reportErr(title, fmt.Errorf("blocked: %s", strings.Join(d.Reasons, "; ")))
@@ -101,9 +105,13 @@ func (m *Model) confirmAndRun(title, site, env string, steps [][]string, interac
 	return m.open(newConfirm(m, title, all, sctx, warnings, func(m *Model, a *safety.Approval) tea.Cmd {
 		actx := safety.WithApproval(context.Background(), a)
 		if len(steps) == 0 {
-			return m.execInteractive(actx, title, site, interactive)
+			return last.run(m, actx, title, site, env)
 		}
-		job, cmd := m.jobs.Start(actx, title, site, env, steps)
+		jobTitle := title
+		if last != nil && last.detached { // the job only prepares (wakes); the run is listed separately
+			jobTitle = "Waking before " + title
+		}
+		job, cmd := m.jobs.Start(actx, jobTitle, site, env, steps)
 		deploy := ""
 		for _, s := range steps {
 			if a := terminus.Args(s); a.Command() == "env:deploy" && len(a.Positionals()) > 0 {
@@ -122,13 +130,29 @@ func (m *Model) confirmAndRun(title, site, env string, steps [][]string, interac
 			m.showOutput, m.showOutputOnJob = true, false
 		}
 		cmd = tea.Batch(cmd, m.startAnim()) // show it moving if the pipeline is open
-		if interactive != nil {
-			m.afterJob[job.ID] = func(m *Model) tea.Cmd { return m.execInteractive(actx, title, site, interactive) }
+		if last != nil {
+			m.afterJob[job.ID] = func(m *Model) tea.Cmd { return last.run(m, actx, title, site, env) }
+			m.afterJobWhat[job.ID] = terminus.Args(last.args).Command()
 		}
-		m.setStatus(fmt.Sprintf("Started: %s", title), false)
+		m.setStatus(fmt.Sprintf("Started: %s · %s shows output", title, m.keys.Key(ActOutput)), false)
 		m.logOutput(theme.Bold.Render("▶ "+title), theme.MutedText.Render("  "+terminus.Args(steps[0]).String()))
 		return tea.Batch(cmd, m.startSpinner())
 	}))
+}
+
+// final is a command run after a job's steps, outside the job queue: in
+// the background, detached so it survives quitting (drush), or with the
+// terminal (interactive palette commands).
+type final struct {
+	args     []string
+	detached bool
+}
+
+func (f *final) run(m *Model, actx context.Context, title, site, env string) tea.Cmd {
+	if f.detached {
+		return m.startDetached(actx, title, site, env, f.args)
+	}
+	return m.execInteractive(actx, title, site, f.args)
 }
 
 func (m *Model) execInteractive(actx context.Context, title, site string, args []string) tea.Cmd {
@@ -138,7 +162,46 @@ func (m *Model) execInteractive(actx context.Context, title, site string, args [
 		return nil
 	}
 	m.logOutput(theme.Bold.Render("▶ " + terminus.Args(args).String()))
-	return tea.ExecProcess(cmd, func(err error) tea.Msg { return execDoneMsg{title: title, site: site, err: err} })
+	done := func(err error) tea.Msg { return execDoneMsg{title: title, site: site, err: err} }
+	if m.opts.NoExecPause {
+		return tea.ExecProcess(cmd, done)
+	}
+	return tea.Exec(&pausedExec{Cmd: cmd, title: terminus.Args(args).String()}, done)
+}
+
+// pausedExec runs a command with the terminal, then waits for Enter before
+// lazyterminus redraws, so the command's output stays on screen to read.
+type pausedExec struct {
+	*exec.Cmd
+	title string // shown while the command connects, which can take a while
+	in    io.Reader
+	out   io.Writer
+}
+
+func (p *pausedExec) SetStdin(r io.Reader)  { p.Stdin, p.in = r, r }
+func (p *pausedExec) SetStdout(w io.Writer) { p.Stdout, p.out = w, w }
+func (p *pausedExec) SetStderr(w io.Writer) { p.Stderr = w }
+
+func (p *pausedExec) Run() error {
+	in, out := p.in, p.out
+	if in == nil {
+		in = os.Stdin
+	}
+	if out == nil {
+		out = os.Stdout
+	}
+	if p.title != "" {
+		fmt.Fprintf(out, "%s\n%s\n\n", theme.Bold.Render("▶ "+p.title), theme.MutedText.Render("Running on Pantheon; output appears when the command sends it…"))
+	}
+	err := p.Cmd.Run()
+	discardTypeahead(in)
+	status := theme.OK.Render(theme.SymSuccess + " Finished")
+	if err != nil {
+		status = theme.Fail.Render(theme.SymFailed + " " + err.Error())
+	}
+	fmt.Fprintf(out, "\n%s · %s ", status, theme.Bold.Render("press Enter to return to lazyterminus"))
+	_, _ = bufio.NewReader(in).ReadString('\n')
+	return err
 }
 
 // onJobMsg applies a job message and reacts to step changes and completion.
@@ -164,7 +227,7 @@ func (m *Model) onJobMsg(msg tea.Msg) tea.Cmd {
 		if msg.Err != nil {
 			m.reportErr(j.Title, msg.Err)
 		} else {
-			m.setStatus(theme.SymSuccess+" "+j.Title+" finished", false)
+			m.setStatus(fmt.Sprintf("%s %s finished · %s shows output", theme.SymSuccess, j.Title, m.keys.Key(ActOutput)), false)
 			m.logOutput(theme.OK.Render(theme.SymSuccess + " " + j.Title + " finished"))
 			cmds = append(cmds, m.recheckAuth())
 			if next := m.afterJob[j.ID]; next != nil {
@@ -172,10 +235,11 @@ func (m *Model) onJobMsg(msg tea.Msg) tea.Cmd {
 			}
 		}
 		delete(m.afterJob, j.ID)
+		delete(m.afterJobWhat, j.ID)
 		m.client.InvalidateSite(j.Site)
 		st := m.state(j.Site)
 		st.inflight = map[string]bool{}
-		cmds = append(cmds, m.ensureSite(j.Site, true))
+		cmds = append(cmds, m.ensureSite(j.Site, true), loadLocalLog(m.opts.HistoryLog))
 		return tea.Batch(cmds...)
 	}
 	return cmd
@@ -200,11 +264,12 @@ func (m *Model) runAction(action string) tea.Cmd {
 			return nil
 		}
 		m.setStatus("Loading commits that would deploy from "+src+"…", false)
-		c := m.client
+		c, repo := m.client, m.cfg.RepoFor(site)
 		return func() tea.Msg {
 			cx, cancel := ctx()
 			defer cancel()
 			log, err := c.CodeLog(cx, site, src, true)
+			log = withFullMessages(repo, log)
 			return deployPreviewMsg{site: site, env: e.ID, src: src, log: log, commits: terminus.DeployableCommits(log, src, e.ID), err: err}
 		}
 
@@ -247,7 +312,11 @@ func (m *Model) runAction(action string) tea.Cmd {
 	case ActDrush:
 		return m.open(&form{
 			title: "Drush · " + se,
-			intro: []string{theme.MutedText.Render("Runs with your terminal attached; lazyterminus resumes when it exits.")},
+			intro: []string{
+				theme.MutedText.Render("Runs in the background, so you can keep working, and keeps running if you quit lazyterminus."),
+				theme.MutedText.Render("It shows in Workflows; its output streams to Output (" + m.keys.Key(ActOutput) + ") and is saved for next time."),
+				theme.MutedText.Render("Nothing can answer a prompt, so add -y to commands that ask (cim, updb, …)."),
+			},
 			fields: []formField{
 				textField("cmd", "drush", "", "status", true, nil),
 			},
@@ -263,8 +332,9 @@ func (m *Model) runAction(action string) tea.Cmd {
 				return append(steps, append([]string{"remote:drush", se, "--"}, words...)), nil
 			},
 			submit: func(m *Model, v formValues, steps [][]string) tea.Cmd {
-				last := steps[len(steps)-1]
-				return m.confirmAndRun("drush "+v["cmd"]+" on "+se, site, e.ID, steps[:len(steps)-1], last, safety.Context{}, nil)
+				cmd := strings.TrimPrefix(strings.TrimSpace(v["cmd"]), "drush ")
+				n := len(steps) - 1
+				return m.confirmAndRun("drush "+cmd+" on "+se, site, e.ID, steps[:n], &final{args: steps[n], detached: true}, safety.Context{}, nil)
 			},
 		})
 
@@ -443,7 +513,7 @@ func (m *Model) onDeployPreview(msg deployPreviewMsg) tea.Cmd {
 		"",
 	}
 	for _, c := range msg.commits {
-		intro = append(intro, fmt.Sprintf("  %s %s %s", theme.Warn.Render(short(c.Hash)), c.Message, theme.MutedText.Render("— "+c.Author)))
+		intro = append(intro, fmt.Sprintf("  %s %s %s", theme.Warn.Render(short(c.Hash)), c.Subject(), theme.MutedText.Render("— "+c.Author)))
 	}
 	dd := m.cfg.DeployDefaults
 	fields := []formField{

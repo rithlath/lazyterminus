@@ -50,6 +50,7 @@ type Config struct {
 	TerminusPath             string              `yaml:"terminus_path"`
 	LazygitPath              string              `yaml:"lazygit_path"`
 	Sites                    []Site              `yaml:"sites"`
+	Repos                    map[string]string   `yaml:"repos"`
 	ProtectedEnvs            []string            `yaml:"protected_envs"`
 	ReadOnly                 bool                `yaml:"read_only"`
 	DeployDefaults           DeployDefaults      `yaml:"deploy_defaults"`
@@ -90,6 +91,12 @@ lazygit_path: lazygit
 sites: []
 #  - name: acme-web
 #    repo: ~/sites/acme-web
+
+# Local git checkouts by site, without limiting which sites are shown. Used
+# for lazygit, the Drupal version, branch status, and full commit messages
+# (Pantheon's code log cuts them at 50 characters). A repo under sites: wins.
+repos: {}
+#  acme-web: ~/sites/acme-web
 
 # Environments where every mutating action requires typing "site.env".
 # live is always protected, even if removed from this list.
@@ -216,6 +223,9 @@ func (c *Config) normalize() {
 	for i := range c.Sites {
 		c.Sites[i].Repo = ExpandHome(c.Sites[i].Repo)
 	}
+	for site, repo := range c.Repos {
+		c.Repos[site] = ExpandHome(repo)
+	}
 }
 
 // ExpandHome expands a leading "~/".
@@ -241,14 +251,15 @@ func (c Config) Allowed(site string) bool {
 	return false
 }
 
-// RepoFor returns the local repo mapped to site, or "".
+// RepoFor returns the local repo mapped to site, or "": its sites: entry's
+// repo, else its repos: entry.
 func (c Config) RepoFor(site string) string {
 	for _, s := range c.Sites {
-		if s.Name == site {
+		if s.Name == site && s.Repo != "" {
 			return s.Repo
 		}
 	}
-	return ""
+	return c.Repos[site]
 }
 
 // SiteForDir returns the configured site whose repo contains dir (the
@@ -262,8 +273,12 @@ func (c Config) SiteForDir(dir string) string {
 		dir = real
 	}
 	best, bestLen := "", -1
-	for _, s := range c.Sites {
-		if s.Repo == "" {
+	mapped := slices.Clone(c.Sites)
+	for name, repo := range c.Repos {
+		mapped = append(mapped, Site{Name: name, Repo: repo})
+	}
+	for _, s := range mapped {
+		if s.Repo == "" || c.RepoFor(s.Name) != s.Repo {
 			continue
 		}
 		repo, err := filepath.Abs(s.Repo)

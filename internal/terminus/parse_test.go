@@ -273,3 +273,53 @@ func TestDecodeRowsNull(t *testing.T) {
 		t.Errorf("rows=%v err=%v", rows, err)
 	}
 }
+
+func TestParseDomainsAndURLs(t *testing.T) {
+	ds, err := ParseDomains([]byte(`{
+		"live-acme.pantheonsite.io": {"id": "live-acme.pantheonsite.io", "type": "platform", "status": "OK", "primary": false, "deletable": false},
+		"acme.example.com": {"id": "acme.example.com", "type": "custom", "status": "OK", "primary": "false", "deletable": true},
+		"www.acme.example.com": {"id": "www.acme.example.com", "type": "custom", "status": "OK", "primary": "true", "deletable": true}
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ds) != 3 {
+		t.Fatalf("got %d domains, want 3", len(ds))
+	}
+	custom := CustomDomains(ds)
+	if len(custom) != 2 || custom[0].ID != "www.acme.example.com" || custom[1].ID != "acme.example.com" {
+		t.Errorf("custom = %+v, want primary first", custom)
+	}
+	e := Env{ID: "live", Domain: "live-acme.pantheonsite.io"}
+	if got := PrimaryURL(e, ds); got != "https://www.acme.example.com" {
+		t.Errorf("PrimaryURL = %q", got)
+	}
+	if got := PrimaryURL(e, nil); got != "https://live-acme.pantheonsite.io" {
+		t.Errorf("PrimaryURL without domains = %q", got)
+	}
+	if empty, err := ParseDomains([]byte("[]")); err != nil || len(empty) != 0 {
+		t.Errorf("empty list: %v, %v", empty, err)
+	}
+}
+
+func TestCommitSubject(t *testing.T) {
+	for _, c := range []struct{ msg, want string }{
+		{"PROJ-77: Add hero banner block", "PROJ-77: Add hero banner block"},
+		{"Fix typo\n\nLonger body", "Fix typo"},
+		// Full messages (from the local repo).
+		{"Merge pull request #54 from kalamuna/icare\n\nICare feedback form", "ICare feedback form (#54)"},
+		{"Merge pull request #54 from kalamuna/icare  ICare feedback form  Adds the webform.", "ICare feedback form (#54)"},
+		{"Merge pull request #48 from kalamuna/sync-config", "PR #48 sync-config"}, // no title
+		{"Merge branch 'dev' into feature", "Merge branch 'dev' into feature"},
+		// Cut at 50 characters by Pantheon.
+		{"Merge pull request #54 from kalamuna/icare  ICare", "ICare (#54)"}, // 49: not cut
+		{"Merge pull request #54 from kalamuna/icaree  ICare", "PR #54 icaree: ICare…"},
+		{"Merge pull request #53 from kalamuna/vendor-upd  V", "PR #53 vendor-upd"},
+		{"Merge pull request #47 from kalamuna/SA-CONTRIB-20", "PR #47 SA-CONTRIB-20…"},
+		{"Update the news listing view so it sorts by date d", "Update the news listing view so it sorts by date d…"},
+	} {
+		if got := (Commit{Message: c.msg}).Subject(); got != c.want {
+			t.Errorf("Subject(%q) [%d] = %q, want %q", c.msg, len(c.msg), got, c.want)
+		}
+	}
+}

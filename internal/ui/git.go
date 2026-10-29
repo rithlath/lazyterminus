@@ -6,12 +6,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/rithlath/lazyterminus/internal/config"
+	"github.com/rithlath/lazyterminus/internal/terminus"
 	"github.com/rithlath/lazyterminus/internal/ui/theme"
 )
 
@@ -30,6 +32,38 @@ func git(repo string, args ...string) (string, error) {
 	defer cancel()
 	out, err := exec.CommandContext(ctx, "git", append([]string{"-C", repo}, args...)...).Output()
 	return strings.TrimSpace(string(out)), err
+}
+
+// withFullMessages swaps in full commit messages from the local repo where
+// it has the commit, since Pantheon's code log cuts them at 50 characters.
+// It returns a copy: log may be the client's cached slice.
+func withFullMessages(repo string, log []terminus.Commit) []terminus.Commit {
+	if repo == "" || len(log) == 0 {
+		return log
+	}
+	args := []string{"log", "--no-walk=unsorted", "--ignore-missing", "--format=%H%x1f%B%x1e"}
+	for _, c := range log {
+		if len(c.Hash) == 40 {
+			args = append(args, c.Hash)
+		}
+	}
+	out, err := git(repo, args...)
+	if err != nil {
+		return log
+	}
+	full := map[string]string{}
+	for _, rec := range strings.Split(out, "\x1e") {
+		if h, body, ok := strings.Cut(strings.TrimSpace(rec), "\x1f"); ok {
+			full[h] = strings.TrimSpace(body)
+		}
+	}
+	log = slices.Clone(log)
+	for i, c := range log {
+		if body := full[c.Hash]; body != "" {
+			log[i].Message = body
+		}
+	}
+	return log
 }
 
 // PantheonRemote returns the name of the repo's Pantheon remote: the one

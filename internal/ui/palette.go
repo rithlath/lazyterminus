@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -341,13 +342,19 @@ func (m *Model) runPaletteCommand(cmd catalog.Command, argv []string) tea.Cmd {
 		title += " " + terminus.Args(argv).Positionals()[0]
 	}
 	mutating := terminus.IsMutating(argv)
-	switch {
+	switch c := terminus.Args(argv).Command(); {
+	case (c == "remote:drush" || c == "remote:wp") && env != "":
+		// Like the x key: a background job, so you can keep working.
+		if k := slices.Index(argv, "--"); k >= 0 {
+			title = strings.TrimPrefix(c, "remote:") + " " + strings.Join(argv[k+1:], " ") + " on " + terminus.SiteEnv(site, env)
+		}
+		return m.confirmAndRun(title, site, env, wakeSteps(site, env), &final{args: argv, detached: true}, safety.Context{}, nil)
 	case cmd.Interactive() && mutating:
 		var steps [][]string
 		if env != "" {
 			steps = wakeSteps(site, env)
 		}
-		return m.confirmAndRun(title, site, env, steps, argv, safety.Context{}, nil)
+		return m.confirmAndRun(title, site, env, steps, &final{args: argv}, safety.Context{}, nil)
 	case cmd.Interactive():
 		return m.execInteractive(context.Background(), title, site, argv)
 	case mutating:

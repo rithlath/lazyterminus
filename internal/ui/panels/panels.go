@@ -212,6 +212,10 @@ type DetailData struct {
 	Branch          string
 	LocalBranch     string // local git status for multidevs
 	UpstreamPending int    // -1 unknown
+	Domains         []terminus.Domain
+	DomainsKnown    bool
+	Local           []terminus.Logged // this machine's commands here, newest first
+	OutputKey       string            // the key that opens Output
 	Err             string
 	Now             time.Time
 }
@@ -232,7 +236,22 @@ func Detail(d DetailData, width, height int) []string {
 	var out []string
 	add := func(l, v string) { out = append(out, field(l, v)) }
 
-	add("Domain", e.Domain)
+	add("URL", terminus.URL(e.Domain))
+	if custom := terminus.CustomDomains(d.Domains); len(custom) > 0 {
+		for i, c := range custom {
+			label := ""
+			if i == 0 {
+				label = "Custom"
+			}
+			v := terminus.URL(c.ID)
+			if c.Primary {
+				v += theme.MutedText.Render(" (primary)")
+			}
+			add(label, v)
+		}
+	} else if !d.DomainsKnown {
+		add("Custom", theme.MutedText.Render("loading…"))
+	}
 	mode := theme.MutedText.Render(e.ConnectionMode)
 	if e.ConnectionMode == "sftp" {
 		mode = theme.SFTP.Render("sftp") + theme.MutedText.Render(" (on-server development)")
@@ -312,7 +331,7 @@ func Detail(d DetailData, width, height int) []string {
 	if len(d.Ahead) > 0 {
 		out = append(out, "", theme.Bold.Render("Commits "+d.AheadLabel+":"))
 		for _, c := range d.Ahead {
-			out = append(out, fmt.Sprintf("  %s %s %s", theme.Warn.Render(short(c.Hash)), c.Message, theme.MutedText.Render("— "+c.Author)))
+			out = append(out, fmt.Sprintf("  %s %s %s", theme.Warn.Render(short(c.Hash)), c.Subject(), theme.MutedText.Render("— "+c.Author)))
 		}
 	}
 	if len(d.Diffstat) > 0 {
@@ -321,6 +340,10 @@ func Detail(d DetailData, width, height int) []string {
 			out = append(out, fmt.Sprintf("  %s %s %s", theme.SFTP.Render(Fit(f.Status, 2)), f.File,
 				theme.MutedText.Render(fmt.Sprintf("+%d −%d", f.Additions, f.Deletions))))
 		}
+	}
+	if len(d.Local) > 0 {
+		out = append(out, "")
+		out = append(out, LocalCommands(d.Local, terminus.SiteEnv(d.Site, e.ID), e.ID, d.OutputKey, d.Now, width)...)
 	}
 	out = append(out, "", theme.Bold.Render("Recent commits on "+e.ID+":"))
 	switch {
@@ -332,12 +355,37 @@ func Detail(d DetailData, width, height int) []string {
 	for _, c := range d.Recent[:min(len(d.Recent), recentCommits)] {
 		// Shorten the message, not who and when.
 		who := "— " + c.Author + " · " + Ago(c.Time(), d.Now)
-		msg, _, _ := strings.Cut(strings.TrimSpace(c.Message), "\n")
-		msg = Fit(msg, max(width-2-len(short(c.Hash))-1-lipgloss.Width(who)-1, 12))
+		msg := Fit(c.Subject(), max(width-2-len(short(c.Hash))-1-lipgloss.Width(who)-1, 12))
 		out = append(out, fmt.Sprintf("  %s %s %s", theme.Warn.Render(short(c.Hash)), msg, theme.MutedText.Render(who)))
 	}
 	if len(out) > height && height > 0 {
 		out = append(out[:height-1], theme.MutedText.Render(fmt.Sprintf("… %d more lines", len(out)-height+1)))
+	}
+	return out
+}
+
+// LocalCommands renders commands this machine ran on env through
+// lazyterminus, under a heading that says they're local, not team-wide, and
+// which key shows their output.
+func LocalCommands(cmds []terminus.Logged, siteEnv, env, outputKey string, now time.Time, width int) []string {
+	out := []string{Fit(theme.Bold.Render("Your recent commands on "+env)+theme.MutedText.Render(" (this machine only) · ")+
+		theme.Key.Render(outputKey)+theme.MutedText.Render(" shows output"), width)}
+	for _, c := range cmds {
+		var sym string
+		switch {
+		case c.Result == "ok":
+			sym = theme.OK.Render(theme.SymSuccess)
+		case strings.HasPrefix(c.Result, "failed"):
+			sym = theme.Fail.Render(theme.SymFailed)
+		case c.Result == "running":
+			sym = theme.Warn.Render(theme.SymRunning)
+		case c.Result == "exec":
+			sym = theme.MutedText.Render("↗") // ran in the terminal; exit not logged
+		default:
+			sym = theme.MutedText.Render(theme.SymUnknown)
+		}
+		when := theme.MutedText.Render(Fit(Ago(c.At, now), 8))
+		out = append(out, Fit(fmt.Sprintf("  %s %s %s", sym, when, c.Describe(siteEnv)), width))
 	}
 	return out
 }

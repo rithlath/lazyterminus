@@ -131,6 +131,8 @@ func (c *confirmModal) view(width int) (string, []string, string) {
 // promptModal is a plain yes/no question (not a safety confirmation).
 type promptModal struct {
 	title, question string
+	detail          []string // lines under the question
+	outro           string   // asked after the detail
 	onYes           func(m *Model) tea.Cmd
 }
 
@@ -149,7 +151,11 @@ func (p *promptModal) update(m *Model, msg tea.Msg) (bool, tea.Cmd) {
 }
 
 func (p *promptModal) view(int) (string, []string, string) {
-	return p.title, []string{p.question, "", theme.Key.Render("y") + " yes   " + theme.Key.Render("n") + " no"}, " y yes · n no "
+	lines := append([]string{p.question}, p.detail...)
+	if p.outro != "" {
+		lines = append(lines, "", p.outro)
+	}
+	return p.title, append(lines, "", theme.Key.Render("y")+" yes   "+theme.Key.Render("n")+" no"), " y yes · n no "
 }
 
 // infoModal shows text (e.g. "nothing to deploy").

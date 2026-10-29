@@ -16,7 +16,8 @@ import (
 //
 // A click does what the matching key does: a single click selects, a double
 // or right click acts like enter, and a key hint is that key. Every form and
-// confirmation still applies; no click runs a command by itself.
+// confirmation still applies; no click runs a command by itself. The one
+// exception to "select first" is a URL, which a click opens in the browser.
 
 type clickKind int
 
@@ -25,6 +26,7 @@ const (
 	clickPanel                    // panel: focus it
 	clickRow                      // panel, index: a list row
 	clickPipe                     // str: a pipeline box's environment
+	clickURL                      // str: a URL to open in the browser
 	clickModal                    // index: a line of the open modal's view
 	clickNone                     // inside the open modal, on nothing
 	clickOutside                  // outside the open modal: esc
@@ -172,6 +174,11 @@ func (m Model) handleClick(msg clickMsg) (tea.Model, tea.Cmd) {
 			return next, tea.Batch(cmd, open)
 		}
 		return m, cmd
+	case clickURL:
+		if msg.right {
+			return m, m.copyURL(t.str)
+		}
+		return m, m.openURL(t.str)
 	case clickPipe:
 		cmd := m.selectEnv(t.str)
 		if act {
@@ -192,7 +199,7 @@ func (m *Model) selectRow(p, i int) tea.Cmd {
 	case panelEnvs:
 		m.envList.Cursor = i
 		m.detailOffset = 0
-		return tea.Batch(m.ensureOps(m.site()), m.ensureBranch())
+		return tea.Batch(m.ensureOps(m.site()), m.ensureBranch(), m.ensureDomains())
 	case panelWorkflows:
 		m.wfList.Cursor = i
 	}
