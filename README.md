@@ -246,6 +246,13 @@ lists what actually ran: under `--dry-run`, intercepted commands are printed
 at exit instead. Changes from earlier sessions are in the
 [history log](#safety).
 
+The Detail panel and the pipeline footer also list your last five changes
+on the selected environment, read back from that log across sessions, in
+plain words: "clear cache", "drush cim -y", "deploy …" (✓ ok, ✗ failed,
+↗ ran in your terminal, where the exit isn't logged). It's local history:
+only what this machine ran through lazyterminus, not your team's or the
+dashboard's activity; the Workflows panel has Pantheon's side.
+
 ### Auto-wake
 
 Terminus can't report whether an environment is asleep, so before drush and

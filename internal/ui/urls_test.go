@@ -1,6 +1,9 @@
 package ui
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -70,4 +73,26 @@ func TestPipelineURLLineAndHistory(t *testing.T) {
 	if got := o.last(); got != "https://live-acme-web.pantheonsite.io" {
 		t.Errorf("click opened %q", got)
 	}
+}
+
+func TestLocalCommandHistory(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "history.log")
+	earlier := "2026-10-20T13:54:48Z\tuser=me\texec\tterminus remote:drush acme-web.dev -- cim -y\n" +
+		"2026-10-20T13:55:00Z\tuser=me\texec\tterminus remote:drush acme-web.test -- cr\n"
+	if err := os.WriteFile(path, []byte(earlier), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	h := start(t, Options{Site: "acme-web", Env: "acme-web.dev", HistoryLog: path}, 140, 50)
+	h.waitText("Your recent commands on dev (local history: this machine, via lazyterminus)")
+	h.waitText("drush cim -y")
+	if strings.Contains(h.screen(), "drush cr") {
+		t.Error("another environment's command shown")
+	}
+
+	h.keys("c")
+	h.waitText("Run it? y/n")
+	h.keys("y")
+	h.waitText("✓ just now clear cache") // logged by this session, read back
+	h.keys("p")
+	h.waitText("Your recent commands on dev")
 }

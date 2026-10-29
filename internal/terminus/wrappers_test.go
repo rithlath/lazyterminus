@@ -100,3 +100,45 @@ func TestHistoryFailureBlocksMutating(t *testing.T) {
 		t.Errorf("reads should still work: %v", err)
 	}
 }
+
+func TestParseHistoryLog(t *testing.T) {
+	log := strings.Join([]string{
+		"2026-10-29T13:54:48Z\tuser=rlath\texec\tterminus remote:drush one-rta.live -- cst",
+		"2026-10-29T14:03:20Z\tuser=rlath\tstart\tterminus env:clear-cache one-rta.live",
+		"2026-10-29T14:03:21Z\tuser=rlath\tstart\tterminus backup:create one-rta.dev --element=all",
+		"2026-10-29T14:03:48Z\tuser=rlath\tok\tterminus env:clear-cache one-rta.live",
+		"2026-10-29T14:04:00Z\tuser=rlath\tfailed(exit=1)\tterminus backup:create one-rta.dev --element=all",
+		"2026-10-29T14:05:00Z\tuser=rlath\tstart\tterminus env:wake one-rta.live",
+		"garbage",
+		"",
+	}, "\n")
+	got := ParseHistoryLog([]byte(log))
+	if len(got) != 4 {
+		t.Fatalf("got %d entries: %+v", len(got), got)
+	}
+	want := []string{"exec", "ok", "failed(exit=1)", ""}
+	for i, w := range want {
+		if got[i].Result != w {
+			t.Errorf("entry %d (%s) result = %q, want %q", i, got[i].Command, got[i].Result, w)
+		}
+	}
+	if !got[1].Involves("one-rta.live") || got[1].Involves("one-rta.dev") || got[1].User != "rlath" {
+		t.Errorf("entry 1 = %+v", got[1])
+	}
+}
+
+func TestLoggedDescribe(t *testing.T) {
+	for _, c := range []struct{ cmd, want string }{
+		{"terminus remote:drush one-rta.live -- cim -y", "drush cim -y"},
+		{"terminus remote:drush one-rta.live -- cst", "drush cst"},
+		{"terminus env:clear-cache one-rta.live", "clear cache"},
+		{"terminus backup:create one-rta.live --element=all", "backup --element=all"},
+		{"terminus env:deploy one-rta.live --cc --note=Ship", "deploy --cc --note=Ship"},
+		{"terminus env:clone-content one-rta.live dev --db-only", "clone content to dev --db-only"},
+		{"terminus multidev:create one-rta.live feature", "multidev:create feature"},
+	} {
+		if got := (Logged{Command: c.cmd}).Describe("one-rta.live"); got != c.want {
+			t.Errorf("Describe(%q) = %q, want %q", c.cmd, got, c.want)
+		}
+	}
+}

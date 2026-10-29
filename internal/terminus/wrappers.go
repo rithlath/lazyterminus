@@ -9,6 +9,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 )
@@ -177,4 +178,89 @@ func (d *DryRun) Command(ctx context.Context, args ...string) (*exec.Cmd, error)
 	}
 	msg := d.intercept(args)
 	return exec.CommandContext(ctx, "sh", "-c", `printf '%s\n\nPress enter to return to lazyterminus...' "$1"; read -r _`, "sh", msg), nil
+}
+
+// Logged is one command from the history log, with its start and result
+// lines folded together.
+type Logged struct {
+	At      time.Time
+	User    string
+	Command string // as logged: "terminus remote:drush site.live -- cim -y"
+	// Result is "ok", "failed…" (e.g. "failed(exit=1)"), "exec" for a
+	// command handed to the terminal (its exit isn't logged), or "" while
+	// only its start is logged (running, or lazyterminus was killed).
+	Result string
+}
+
+// Involves reports whether the command names site.env as an argument.
+func (l Logged) Involves(siteEnv string) bool {
+	return slices.Contains(strings.Fields(l.Command), siteEnv)
+}
+
+// Describe says what the command did to siteEnv in plain words: "clear
+// cache", "drush cim -y", "deploy --note=…"; anything else is the command
+// with "terminus" and siteEnv left out.
+func (l Logged) Describe(siteEnv string) string {
+	f := strings.Fields(strings.TrimPrefix(l.Command, "terminus "))
+	if len(f) == 0 {
+		return l.Command
+	}
+	cmd, rest := f[0], slices.DeleteFunc(f[1:], func(s string) bool { return s == siteEnv })
+	tail := func(words ...string) string { return strings.Join(append(words, rest...), " ") }
+	switch cmd {
+	case "remote:drush", "drush", "remote:wp", "wp":
+		tool := strings.TrimPrefix(cmd, "remote:")
+		if len(rest) > 0 && rest[0] == "--" {
+			rest = rest[1:]
+		}
+		return tail(tool)
+	case "env:clear-cache", "env:cc", "cc":
+		return tail("clear cache")
+	case "env:deploy", "deploy":
+		return tail("deploy")
+	case "env:wake":
+		return tail("wake")
+	case "env:commit":
+		return tail("commit SFTP changes")
+	case "backup:create":
+		return tail("backup")
+	case "connection:set":
+		return tail("set connection mode")
+	case "env:clone-content":
+		if len(rest) > 0 { // source is siteEnv here; rest[0] is the target
+			return "clone content to " + strings.Join(rest, " ")
+		}
+	}
+	return tail(cmd)
+}
+
+// ParseHistoryLog reads the history log, oldest first. Lines it can't parse
+// are skipped.
+func ParseHistoryLog(data []byte) []Logged {
+	var out []Logged
+	pending := map[string]int{} // command → index of its unfinished start
+	for _, line := range strings.Split(string(data), "\n") {
+		f := strings.SplitN(line, "\t", 4)
+		if len(f) != 4 {
+			continue
+		}
+		at, err := time.Parse(time.RFC3339, f[0])
+		if err != nil {
+			continue
+		}
+		event, cmd := f[2], f[3]
+		switch {
+		case event == "start":
+			pending[cmd] = len(out)
+			out = append(out, Logged{At: at, User: strings.TrimPrefix(f[1], "user="), Command: cmd})
+		case event == "ok" || strings.HasPrefix(event, "failed"):
+			if i, ok := pending[cmd]; ok {
+				out[i].Result = event
+				delete(pending, cmd)
+			}
+		case event == "exec":
+			out = append(out, Logged{At: at, User: strings.TrimPrefix(f[1], "user="), Command: cmd, Result: "exec"})
+		}
+	}
+	return out
 }

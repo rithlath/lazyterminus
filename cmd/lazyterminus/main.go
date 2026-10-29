@@ -67,7 +67,7 @@ func run() error {
 	}
 	r, dry, rec := safety.Chain(base, cfg, historyPath, *dryRun)
 
-	model := ui.New(ui.Options{Runner: r, Recorder: rec, Config: cfg, Site: *site, Env: *env, Mock: *mock, DryRun: *dryRun})
+	model := ui.New(ui.Options{Runner: r, Recorder: rec, Config: cfg, Site: *site, Env: *env, Mock: *mock, DryRun: *dryRun, HistoryLog: historyPath})
 	if _, err := tea.NewProgram(model).Run(); err != nil {
 		return err
 	}

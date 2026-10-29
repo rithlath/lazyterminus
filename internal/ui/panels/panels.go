@@ -214,6 +214,7 @@ type DetailData struct {
 	UpstreamPending int    // -1 unknown
 	Domains         []terminus.Domain
 	DomainsKnown    bool
+	Local           []terminus.Logged // this machine's commands here, newest first
 	Err             string
 	Now             time.Time
 }
@@ -339,6 +340,10 @@ func Detail(d DetailData, width, height int) []string {
 				theme.MutedText.Render(fmt.Sprintf("+%d −%d", f.Additions, f.Deletions))))
 		}
 	}
+	if len(d.Local) > 0 {
+		out = append(out, "")
+		out = append(out, LocalCommands(d.Local, terminus.SiteEnv(d.Site, e.ID), e.ID, d.Now, width)...)
+	}
 	out = append(out, "", theme.Bold.Render("Recent commits on "+e.ID+":"))
 	switch {
 	case !d.RecentKnown:
@@ -354,6 +359,29 @@ func Detail(d DetailData, width, height int) []string {
 	}
 	if len(out) > height && height > 0 {
 		out = append(out[:height-1], theme.MutedText.Render(fmt.Sprintf("… %d more lines", len(out)-height+1)))
+	}
+	return out
+}
+
+// LocalCommands renders commands this machine ran on env through
+// lazyterminus, under a heading that says they're local, not team-wide.
+func LocalCommands(cmds []terminus.Logged, siteEnv, env string, now time.Time, width int) []string {
+	out := []string{theme.Bold.Render("Your recent commands on "+env) +
+		theme.MutedText.Render(" (local history: this machine, via lazyterminus)")}
+	for _, c := range cmds {
+		var sym string
+		switch {
+		case c.Result == "ok":
+			sym = theme.OK.Render(theme.SymSuccess)
+		case strings.HasPrefix(c.Result, "failed"):
+			sym = theme.Fail.Render(theme.SymFailed)
+		case c.Result == "exec":
+			sym = theme.MutedText.Render("↗") // ran in the terminal; exit not logged
+		default:
+			sym = theme.MutedText.Render(theme.SymUnknown)
+		}
+		when := theme.MutedText.Render(Fit(Ago(c.At, now), 8))
+		out = append(out, Fit(fmt.Sprintf("  %s %s %s", sym, when, c.Describe(siteEnv)), width))
 	}
 	return out
 }

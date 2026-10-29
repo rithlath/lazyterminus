@@ -218,7 +218,7 @@ func (m *Model) onJobMsg(msg tea.Msg) tea.Cmd {
 		m.client.InvalidateSite(j.Site)
 		st := m.state(j.Site)
 		st.inflight = map[string]bool{}
-		cmds = append(cmds, m.ensureSite(j.Site, true))
+		cmds = append(cmds, m.ensureSite(j.Site, true), loadLocalLog(m.opts.HistoryLog))
 		return tea.Batch(cmds...)
 	}
 	return cmd

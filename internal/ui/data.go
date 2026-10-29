@@ -57,6 +57,9 @@ type (
 		account string
 		err     error
 	}
+	localLogMsg struct {
+		entries []terminus.Logged
+	}
 	clockMsg time.Time
 	errMsg   struct {
 		context string
@@ -184,6 +187,31 @@ func loadOps(c *terminus.Client, site, id string, finished bool) tea.Cmd {
 		ops, err := c.WorkflowOps(cx, site, id, finished)
 		return opsMsg{site: site, id: id, ops: ops, err: err}
 	}
+}
+
+// loadLocalLog reads the history log (commands this machine ran through
+// lazyterminus). A missing log is an empty history.
+func loadLocalLog(path string) tea.Cmd {
+	if path == "" {
+		return nil
+	}
+	return func() tea.Msg {
+		b, _ := os.ReadFile(path)
+		return localLogMsg{entries: terminus.ParseHistoryLog(b)}
+	}
+}
+
+// localCommands returns the newest n logged commands naming site.env,
+// newest first.
+func (m *Model) localCommands(site, env string, n int) []terminus.Logged {
+	se := terminus.SiteEnv(site, env)
+	var out []terminus.Logged
+	for i := len(m.localLog) - 1; i >= 0 && len(out) < n; i-- {
+		if m.localLog[i].Involves(se) {
+			out = append(out, m.localLog[i])
+		}
+	}
+	return out
 }
 
 func loadDrupal(site, repo string) tea.Cmd {

@@ -36,6 +36,9 @@ type Options struct {
 	CatalogDir string
 	// OpenURL overrides opening a URL in the browser (tests).
 	OpenURL func(url string) error
+	// HistoryLog is the history log file, read back for each environment's
+	// local command history.
+	HistoryLog string
 	// NoExecPause skips "press Enter to return" after an interactive
 	// command (tests).
 	NoExecPause bool
@@ -106,6 +109,8 @@ type Model struct {
 	landed       map[string]map[string]landing
 	started      time.Time
 
+	localLog []terminus.Logged // the history log, oldest first
+
 	catalog         *catalog.Catalog
 	catalogLoading  bool
 	paletteWanted   bool
@@ -155,7 +160,7 @@ func (m *Model) now() time.Time {
 func (m Model) Init() tea.Cmd {
 	// The catalog loads in the background at startup so ":" opens instantly.
 	return tea.Batch(checkAuth(m.client), loadSites(m.client, false), m.spinner.Tick, clockTick(),
-		loadCatalog(m.opts.Runner, m.catalogDir(), false))
+		loadCatalog(m.opts.Runner, m.catalogDir(), false), loadLocalLog(m.opts.HistoryLog))
 }
 
 // ---- selection helpers ----------------------------------------------------
@@ -487,7 +492,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.client.InvalidateSite(msg.site)
 		m.state(msg.site).inflight = map[string]bool{}
-		return m, m.ensureSite(msg.site, true)
+		return m, tea.Batch(m.ensureSite(msg.site, true), loadLocalLog(m.opts.HistoryLog))
+
+	case localLogMsg:
+		m.localLog = msg.entries
+		return m, nil
 
 	case spinner.TickMsg:
 		if !m.busy() {

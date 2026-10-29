@@ -300,6 +300,7 @@ func (m *Model) detailData() panels.DetailData {
 		d.LocalBranch = m.localBranchStatus(site, e.ID)
 	}
 	d.Domains, d.DomainsKnown = st.domains[envID]
+	d.Local = m.localCommands(site, envID, localShown)
 	return d
 }
 

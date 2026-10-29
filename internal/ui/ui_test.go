@@ -80,7 +80,10 @@ func startWith(t *testing.T, mock *terminus.MockRunner, opts Options, dryRun boo
 		opts.Config = testConfig()
 	}
 	var dry *terminus.DryRun
-	opts.Runner, dry, opts.Recorder = safety.Chain(mock, opts.Config, filepath.Join(t.TempDir(), "history.log"), dryRun)
+	if opts.HistoryLog == "" {
+		opts.HistoryLog = filepath.Join(t.TempDir(), "history.log")
+	}
+	opts.Runner, dry, opts.Recorder = safety.Chain(mock, opts.Config, opts.HistoryLog, dryRun)
 	opts.DryRun = dryRun
 	opts.NoExecPause = true
 	if opts.CatalogDir == "" {

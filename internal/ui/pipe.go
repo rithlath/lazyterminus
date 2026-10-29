@@ -490,6 +490,12 @@ func (m *Model) pipelineFooter(width, maxLines int) []string {
 		}
 		add(theme.Fail.Render(fmt.Sprintf("%s %s: %s failed %s: %s", theme.SymFailed, env, f.Workflow, panels.Ago(f.StartedAt.Time(), m.now()), reason)))
 	}
+	if cmds := m.localCommands(site, env, localShown); len(cmds) > 0 {
+		cmds = cmds[:min(len(cmds), max(maxLines-len(out)-3, 0))] // leave room for commits
+		if len(cmds) > 0 {
+			add(panels.LocalCommands(cmds, terminus.SiteEnv(site, env), env, m.now(), width)...)
+		}
+	}
 	// The environment's own history fills what's left.
 	if room := min(maxLines-len(out)-1, pipeRecent); room > 0 {
 		log, ok := st.codeLogs[env]
@@ -512,6 +518,10 @@ func (m *Model) pipelineFooter(width, maxLines int) []string {
 	}
 	return out
 }
+
+// localShown is how many of this machine's commands on an environment the
+// Detail panel and pipeline footer list.
+const localShown = 5
 
 // pipeRecent is how many of the selected environment's commits the
 // pipeline footer lists, room permitting.
