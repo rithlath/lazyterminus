@@ -83,6 +83,7 @@ type Model struct {
 	spinner  spinner.Model
 	bar      progress.Model
 	spinning bool
+	pulse    int // spinner ticks so far; drives the shimmer on running lines
 
 	status      string
 	statusErr   bool
@@ -510,6 +511,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.spinning = false
 			return m, nil
 		}
+		m.pulse++
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
@@ -538,6 +540,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(m.startSpinner(), m.startAnim())
 
 	case sitesLoadedMsg:
+		first := !m.sitesLoaded
 		m.sitesLoaded = true
 		if msg.err != nil {
 			m.sitesErr = msg.err
@@ -557,7 +560,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.setStatus("No sites found (check the sites allowlist in "+m.cfg.Path+")", true)
 			return m, nil
 		}
-		m.setStatus(fmt.Sprintf("%d sites", len(sites)), false)
+		if !first || m.status == "" { // at startup, keep a notice already showing (runs that ended while closed)
+			m.setStatus(fmt.Sprintf("%d sites", len(sites)), false)
+		}
 		want := prev
 		if want == "" {
 			want = m.opts.Site

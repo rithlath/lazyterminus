@@ -200,7 +200,7 @@ func (m *Model) renderPanel(p int, r rect) string {
 	case panelWorkflows:
 		d := panels.WorkflowsData{
 			Workflows: st.wfs, Progress: map[string][2]int{}, Spinner: m.spinner.View(),
-			Bar: m.bar, Now: m.now(), Jobs: m.jobRows(),
+			Frame: m.pulse, Bar: m.bar, Now: m.now(), Jobs: m.jobRows(),
 		}
 		for id, ops := range st.ops {
 			done, total := terminus.Progress(ops)
@@ -326,7 +326,7 @@ func (m *Model) jobRows() []panels.JobRow {
 		if r.Site != m.site() || r.Done && m.now().Sub(r.Ended) > recentRunFor {
 			continue
 		}
-		row := panels.JobRow{Title: r.Title + " (background)", Running: !r.Done, Failed: r.Failed(), Started: r.Started, Ended: r.Ended}
+		row := panels.JobRow{Title: r.Title + " (background)", Background: true, Running: !r.Done, Failed: r.Failed(), Started: r.Started, Ended: r.Ended}
 		if r.Failed() {
 			row.Err = fmt.Sprintf("exit %d", r.ExitCode)
 		}
