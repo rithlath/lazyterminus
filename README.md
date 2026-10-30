@@ -5,59 +5,11 @@ CLI, in the spirit of lazygit and lazydocker: see where every Pantheon site
 and environment stands, watch workflows, and run Terminus actions without
 typing long commands, behind a safety layer built for production sites.
 
-```
-╭─ [1] Sites ──────────────────────────────────╮╭─ [3] acme-web.test ──────────────────────────────────────────────────╮
-│   acme-intranet  drupal   8 envs             ││ Domain        test-acme-web.pantheonsite.io                          │
-│   acme-portal    drupal   3 envs             ││ Connection    git                                                    │
-│ › acme-web       drupal   12 envs            ││ PHP           8.4                                                    │
-│   sandbox-12     drupal   3 envs             ││ Drupal        unknown (no local repo mapped)                         │
-╰───────────────────────────────────── 3 of 4 ─╯│ Protection    protected (typed confirmation)                         │
-╭─ [2] Environments · acme-web ────────────────╮│ Commits       ↑2 ready to deploy from dev                            │
-│   ● dev         git                          ││ Last deploy   ✗ 7h ago by user1@example.com                          │
-│ › ✗ test        git ↑2 failed                ││                                                                      │
-│   ● live        git ↑1                       ││ ✗ Failed 7h ago: Deploy code to "test"                               │
-│ ── multidevs ─────────────────────────────── ││   Bring application container to desired configuration state         │
-│   ● annual      git                          ││                                                                      │
-│   ● contact-us  git                          ││ Commits ready to deploy from dev:                                    │
-│   ● d11         git ↑11                      ││   a1c9e0f PROJ-77: Add hero banner block to homepage — Developer B   │
-│   ● feedback    sftp ↑1 ✎2 uncommitted       ││   b2d0f1a PROJ-76: Update news listing view config — Developer A     │
-│   ● newsletter  git                          │╰──────────────────────────────────────────────────────────────────────╯
-│   ● proj-19     git                          │╭─ [4] Workflows ──────────────────────────────────────────────────────╮
-│   ● proj-29     git                          ││   ✓ Automated backup for the "dev" environment          dev · 1h ago │
-│   ● proj-40     git                          ││   ✓ Automated backup for the "live" environment        live · 1h ago │
-│   ● schedules   git                          ││   ✗ Deploy code to "test"                              test · 7h ago │
-│                                              ││   ✓ Automated backup for the "test" environment        test · 9h ago │
-│                                              ││   ✓ Converge resources based on updated proper… newsletter · 19h ago │
-│                                              ││   ✓ Sync Advanced Edge configuration (if any) … newsletter · 19h ago │
-│                                              ││   ✓ Create a Multidev environment                     site · 19h ago │
-│                                              ││   ✓ Automated backup for the "dev" environment          dev · 1d ago │
-│                                              ││   ✓ Automated backup for the "live" environment        live · 1d ago │
-│                                              ││   ✓ Automated backup for the "test" environment        test · 1d ago │
-│                                              ││   ✓ Automated backup for the "dev" environment          dev · 2d ago │
-│                                              ││   ✓ Automated backup for the "live" environment        live · 2d ago │
-╰──────────────────────────────────── 12 envs ─╯╰──────────────────────────────────────────────────────────────────────╯
- lazyterminus   MOCK  4 sites                                                                             acme-web.test
-d deploy  c cache  b backup  l clone  m mode  w wake  x drush  o commit  n new md  D del md  u upstream  : palette  g l…
-```
+![lazyterminus showing sites, environments, detail and workflows](screenshots/main.png)
 
-That is `lazyterminus --mock --env acme-web.test` at 120×32. More captures: [deploy form](docs/screen-deploy.txt),
-[command palette](docs/screen-palette.txt), [narrow layout](docs/screen-narrow.txt).
-`make demo` records an animated GIF from [docs/demo.tape](docs/demo.tape)
-with [VHS](https://github.com/charmbracelet/vhs).
-
-## Drupal only
-
-lazyterminus is built for Drupal sites and has only been checked against
-Drupal (`drupal8` framework) Terminus output; it has never been run against a
-WordPress site. Most actions are plain Terminus commands that don't depend on
-the framework (pipeline, deploy, backup, clone, cache, mode, wake, multidevs,
-upstream updates, history), and WP-CLI is reachable from the command palette
-(`remote:wp`, alias `wp`). But on a WordPress site:
-
-- `x` still runs drush, not WP-CLI.
-- The deploy form's note that Quicksilver hooks run `drush cim` doesn't apply.
-- The Detail panel's Drupal version (read from `drupal/core` in the mapped
-  repo's `composer.lock`) shows "not in composer.lock".
+Tested on Drupal sites on Pantheon. Most actions are plain Terminus commands
+that don't depend on the framework, so other sites should work too, but `x`
+runs drush and the Detail panel reads the Drupal version from `composer.lock`.
 
 ## Install
 
@@ -182,6 +134,8 @@ only"). Choosing an entry, or pressing its key, runs the same flow as the key
 itself, with the same confirmations; the last entry opens the command
 palette for that environment.
 
+![Action menu](screenshots/action-menu.png)
+
 ### Deploys
 
 Pantheon deploys promote **every** commit waiting in the environment below;
@@ -198,14 +152,7 @@ then dev → test → live. Each box shows the environment's state, connection
 mode, newest commit, and when it last changed; each hop shows how many
 commits are waiting to move (`↑2`) or `✓` when nothing is.
 
-```
-╭─ dev ───────────────────╮        ╔═ test ══════════════════╗        ╭─ live ──────────────────╮
-│ ● in sync               │   ↑2   ║ ◒ deploying 3/6         ║   ↑1   │ ↑ 1 commit waiting      │
-│ git                     │━━━●━━━▶║ git                     ║───────▶│ git                     │
-│ a1c9e0f PROJ-77: Add h… │        ║ c3e1a2b PROJ-75: Bump … ║        │ 39634da Test/live buil… │
-│ committed 22h ago       │        ║ ███████░░░░░░░░░░░░ 21s ║        │ deployed 4d ago         │
-╰─────────────────────────╯        ╚═════════════════════════╝        ╰─────────────────────────╯
-```
+![Pipeline view](screenshots/pipeline.png)
 
 While a deploy runs, dots flow along the hop, the target box shows its
 progress (Pantheon workflow operations done/total), and the commits moving
@@ -229,7 +176,7 @@ list on the next poll.
 The selection is shared with the Environments panel: `←`/`→` (or `j`/`k`) move it, every
 action key (`d`, `c`, `x`, …) acts on the selected box, `enter` jumps to its
 Detail panel, and `p` or `esc` goes back. Under 100 columns the chain stacks
-vertically. The full capture is [docs/screen-pipeline.txt](docs/screen-pipeline.txt).
+vertically.
 
 ### History view
 
@@ -434,10 +381,6 @@ over time, and records every mutating call so tests can assert exactly what
 would have run. UI tests drive the whole app with
 [teatest](https://github.com/charmbracelet/x/tree/main/exp/teatest) through
 the same safety chain as the real binary.
-
-Where Terminus behaves differently from what you might expect (no "asleep"
-state, no Drupal version, labels in code logs, aliases, `--no-interaction`
-answering "no"), see [NOTES.md](NOTES.md).
 
 ```
 cmd/lazyterminus/   main, flags
