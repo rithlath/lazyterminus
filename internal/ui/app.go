@@ -60,6 +60,9 @@ const (
 
 var panelNames = [numPanels]string{"Sites", "Environments", "Detail", "Workflows"}
 
+// loadingSites is the status until site:list returns.
+const loadingSites = "Loading sites…"
+
 // Model is the root model.
 type Model struct {
 	opts   Options
@@ -140,7 +143,7 @@ func New(opts Options) Model {
 		bar: progress.New(progress.WithColors(theme.Amber, theme.Green), progress.WithoutPercentage(),
 			progress.WithFillCharacters('█', '░')),
 		outputView: viewport.New(),
-		status:     "Loading sites…",
+		status:     loadingSites,
 		jobs:       jobs.New(opts.Runner),
 		afterJob:   map[int]func(*Model) tea.Cmd{}, afterJobWhat: map[int]string{},
 		landed: map[string]map[string]landing{},
@@ -560,7 +563,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.setStatus("No sites found (check the sites allowlist in "+m.cfg.Path+")", true)
 			return m, nil
 		}
-		if !first || m.status == "" { // at startup, keep a notice already showing (runs that ended while closed)
+		if !first || m.status == "" || m.status == loadingSites { // at startup, keep a notice already showing (runs that ended while closed)
 			m.setStatus(fmt.Sprintf("%d sites", len(sites)), false)
 		}
 		want := prev

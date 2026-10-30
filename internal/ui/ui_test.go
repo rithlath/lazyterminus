@@ -166,6 +166,14 @@ func TestStartsAndQuits(t *testing.T) {
 	h.tm.WaitFinished(t, teatest.WithFinalTimeout(2*time.Second))
 }
 
+func TestLoadingStatusClearsWhenSitesLoad(t *testing.T) {
+	h := start(t, Options{}, 130, 36)
+	h.waitText("4 sites")
+	if strings.Contains(h.screen(), loadingSites) {
+		t.Fatalf("still shows %q after sites loaded:\n%s", loadingSites, h.screen())
+	}
+}
+
 func TestNavigationAndFocus(t *testing.T) {
 	h := start(t, Options{Site: "acme-web"}, 130, 36)
 	h.waitText("feedback")
