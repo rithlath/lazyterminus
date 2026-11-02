@@ -73,7 +73,7 @@ func TestFerryKeyLaunches(t *testing.T) {
 	h.keys("f")
 	h.waitText("Back from ferry; refreshing acme-web.dev")
 	id := h.siteID("acme-web")
-	want := []string{"--local-dir", repo, "--remote-dir", "files", "--label", "acme-web.dev", pantheonSFTPTarget(id, "dev")}
+	want := []string{"--local-dir", repo, "--remote-dir", "files", "--label", "acme-web", "--tag", "dev", pantheonSFTPTarget(id, "dev")}
 	if got := ferryArgs(t, marker); strings.Join(got, "|") != strings.Join(want, "|") {
 		t.Fatalf("ferry args = %q, want %q", got, want)
 	}

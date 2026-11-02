@@ -361,7 +361,9 @@ customCommands:
 `f` on an environment hands the terminal to [ferry](https://github.com/rithlath/ferry),
 already connected to that environment over SFTP: the site's repo (from
 `sites[].repo` or `repos:`) on the left, the environment's `files/` on the
-right. Quit ferry (`q`) to come back; lazyterminus refreshes the site.
+right. ferry's Remote pane shows the environment as a coloured tag (dev
+green, test amber, live red, a multidev blue) before the site name. Quit
+ferry (`q`) to come back; lazyterminus refreshes the site.
 
 - No connection-mode switch is needed to upload to `files/`, on any
   environment, live included, and `f` never asks first. Uploading code needs
