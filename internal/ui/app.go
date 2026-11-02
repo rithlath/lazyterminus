@@ -487,6 +487,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case lazygitDoneMsg:
 		return m, m.onLazygitDone(msg)
 
+	case ferryDoneMsg:
+		return m, m.onFerryDone(msg)
+
 	case paletteResultMsg:
 		m.onPaletteResult(msg)
 		return m, nil
@@ -784,7 +787,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.jobs.CancelAll()
 		return m, tea.Quit
 	case ActDeploy, ActClearCache, ActBackup, ActCloneContent, ActConnectionMode, ActWake,
-		ActDrush, ActCommit, ActCreateMultidev, ActDeleteMultidev, ActUpstream:
+		ActDrush, ActCommit, ActCreateMultidev, ActDeleteMultidev, ActUpstream, ActFerry:
 		return m, m.runAction(action)
 	case ActOpenURL:
 		return m, m.openEnvURL()

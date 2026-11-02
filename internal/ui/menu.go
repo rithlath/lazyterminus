@@ -108,6 +108,7 @@ func (m *Model) envMenuItems(site string, e *terminus.Env) []menuItem {
 		items = append(items, item(ActDeleteMultidev, "Delete multidev", "multidevs only"))
 	}
 
+	items = append(items, item(ActFerry, "Open in ferry (upload files over SFTP)", ""))
 	items = append(items, item(ActUpstream, "Upstream updates", ""))
 	if urls := m.envURLs(site, e.ID); len(urls) > 0 {
 		items = append(items, item(ActOpenURL, "Open "+urls[0]+" in browser", ""), item(ActCopyURL, "Copy "+urls[0], ""))

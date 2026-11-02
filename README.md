@@ -106,6 +106,7 @@ On the selected environment:
 | `u` | upstream updates (shown in Output) | `upstream:updates:list` |
 | `v` | open in the browser (primary custom domain, else `*.pantheonsite.io`) | `domain:list` |
 | `y` | copy that URL to the clipboard (right-click a URL in the pipeline to copy that one) | — |
+| `f` | open [ferry](#ferry-integration) on this environment, to upload files over SFTP | — |
 
 Rebind anything in the config under `keymap:` using the action names shown in
 `?` help.
@@ -291,6 +292,7 @@ go through the same safety layer as the keys.
 ```yaml
 terminus_path: terminus
 lazygit_path: lazygit
+ferry_path: ferry            # opened with f on an environment
 sites:                      # optional allowlist; empty means all sites from site:list
   - name: acme-web
     repo: ~/sites/acme-web
@@ -353,6 +355,27 @@ customCommands:
       git push "$(git remote -v | awk '/drush\.in/ {print $1; exit}')" "$branch"
     output: log
 ```
+
+## ferry integration
+
+`f` on an environment hands the terminal to [ferry](https://github.com/rithlath/ferry),
+already connected to that environment over SFTP: the site's repo (from
+`sites[].repo` or `repos:`) on the left, the environment's `files/` on the
+right. Quit ferry (`q`) to come back; lazyterminus refreshes the site.
+
+- No connection-mode switch is needed to upload to `files/`, on any
+  environment, live included, and `f` never asks first. Uploading code needs
+  dev or a multidev in SFTP mode (`m`); in Git mode ferry reports permission
+  denied.
+- ferry signs in with your SSH key registered with Pantheon (agent or
+  `~/.ssh/id_*`), so new multidevs work with no setup. The first visit to
+  each environment asks you to trust its host key once.
+- The SFTP address is Pantheon's `<env>.<site-id>@appserver.<env>.<site-id>.drush.in:2222`,
+  built from the site's ID: no Terminus call.
+- Set `ferry_path` if ferry isn't on your `PATH` (install it with
+  `make install` in the ferry repo). Without ferry, `f` only says so.
+- `read_only` and `--dry-run` refuse `f`, since ferry can change files.
+  `--mock` opens `ferry --mock`, never a real server.
 
 ## Flags
 

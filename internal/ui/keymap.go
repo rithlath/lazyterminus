@@ -23,6 +23,7 @@ const (
 	ActDown           = "down"
 	ActSelect         = "select"
 	ActLazygit        = "lazygit"
+	ActFerry          = "ferry"
 	ActOutput         = "output"
 	ActPipeline       = "pipeline"
 	ActHistory        = "history"
@@ -80,6 +81,7 @@ var defaultBindings = []binding{
 	{ActUpstream, []string{"u"}, "upstream updates", "Environment"},
 	{ActOpenURL, []string{"v"}, "open in browser", "Environment"},
 	{ActCopyURL, []string{"y"}, "copy URL", "Environment"},
+	{ActFerry, []string{"f"}, "files (ferry)", "Environment"},
 }
 
 // KeyMap resolves key presses to actions.
