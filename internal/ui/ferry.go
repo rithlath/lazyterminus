@@ -52,7 +52,8 @@ func (m *Model) ferryCommand(site string, e *terminus.Env) (args []string, note 
 	if id == "" {
 		return nil, "", errSiteLoading
 	}
-	args = append(local, "--remote-dir", "files", "--label", site+"."+e.ID, pantheonSFTPTarget(id, e.ID))
+	// --tag shows the environment as a coloured tag in ferry's Remote pane.
+	args = append(local, "--remote-dir", "files", "--label", site, "--tag", e.ID, pantheonSFTPTarget(id, e.ID))
 	return args, note, nil
 }
 
