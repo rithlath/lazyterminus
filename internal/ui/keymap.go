@@ -23,6 +23,7 @@ const (
 	ActDown           = "down"
 	ActSelect         = "select"
 	ActLazygit        = "lazygit"
+	ActFerry          = "ferry"
 	ActOutput         = "output"
 	ActPipeline       = "pipeline"
 	ActHistory        = "history"
@@ -82,6 +83,7 @@ var defaultBindings = []binding{
 	{ActOpenURL, []string{"v"}, "open in browser", "Environment"},
 	{ActCopyURL, []string{"y"}, "copy URL", "Environment"},
 	{ActDashboard, []string{"P"}, "open in Pantheon dashboard", "Environment"},
+	{ActFerry, []string{"f"}, "files (ferry)", "Environment"},
 }
 
 // KeyMap resolves key presses to actions.

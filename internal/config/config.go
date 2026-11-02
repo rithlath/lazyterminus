@@ -49,6 +49,7 @@ func (d Duration) MarshalYAML() (any, error) { return time.Duration(d).String(),
 type Config struct {
 	TerminusPath             string              `yaml:"terminus_path"`
 	LazygitPath              string              `yaml:"lazygit_path"`
+	FerryPath                string              `yaml:"ferry_path"`
 	Sites                    []Site              `yaml:"sites"`
 	Repos                    map[string]string   `yaml:"repos"`
 	ProtectedEnvs            []string            `yaml:"protected_envs"`
@@ -68,6 +69,7 @@ func Default() Config {
 	return Config{
 		TerminusPath:   "terminus",
 		LazygitPath:    "lazygit",
+		FerryPath:      "ferry",
 		ProtectedEnvs:  []string{"live", "test"},
 		DeployDefaults: DeployDefaults{ClearCache: true, UpdateDB: true},
 		PollInterval:   Duration(10 * time.Second),
@@ -85,6 +87,9 @@ terminus_path: terminus
 
 # Path to lazygit, opened with "g" in the mapped repo.
 lazygit_path: lazygit
+
+# Path to ferry, opened with "f" on an environment (SFTP to it).
+ferry_path: ferry
 
 # Optional allowlist of sites, each mapped to its local git checkout.
 # Empty means every site from "terminus site:list".
@@ -207,6 +212,9 @@ func (c *Config) normalize() {
 	}
 	if c.LazygitPath == "" {
 		c.LazygitPath = "lazygit"
+	}
+	if c.FerryPath == "" {
+		c.FerryPath = "ferry"
 	}
 	if !slices.Contains(c.ProtectedEnvs, "live") {
 		c.ProtectedEnvs = append(c.ProtectedEnvs, "live")

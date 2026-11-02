@@ -167,3 +167,20 @@ func TestReposMapsWithoutAllowlisting(t *testing.T) {
 		t.Errorf("SiteForDir via repos: = %q", got)
 	}
 }
+
+func TestDefaultFerryPath(t *testing.T) {
+	if got := Default().FerryPath; got != "ferry" {
+		t.Fatalf("Default().FerryPath = %q", got)
+	}
+	cfg, err := Parse([]byte("ferry_path:\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.FerryPath != "ferry" {
+		t.Fatalf("empty ferry_path = %q, want ferry", cfg.FerryPath)
+	}
+	cfg, err = Parse([]byte(DefaultFile))
+	if err != nil || cfg.FerryPath != "ferry" {
+		t.Fatalf("DefaultFile ferry_path = %q, err %v", cfg.FerryPath, err)
+	}
+}

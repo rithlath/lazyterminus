@@ -257,6 +257,8 @@ func (m *Model) runAction(action string) tea.Cmd {
 	}
 	se := terminus.SiteEnv(site, e.ID)
 	switch action {
+	case ActFerry:
+		return m.openFerry(site, e)
 	case ActDeploy:
 		src := terminus.SourceEnv(e.ID)
 		if src == "" {
