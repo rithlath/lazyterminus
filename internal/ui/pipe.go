@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -412,6 +413,11 @@ func (m *Model) pipelineGraph() pipeline.Graph {
 		}
 		g.Edges = append(g.Edges, e)
 	}
+	if m.pipeFiltering || m.pipeFilter != "" {
+		total := len(g.Multidevs)
+		g.Multidevs = matchingMultidevs(g.Multidevs, m.pipeFilter)
+		g.Filter = &pipeline.Filter{Text: m.pipeFilter, Typing: m.pipeFiltering, Total: total}
+	}
 	return g
 }
 
@@ -427,6 +433,55 @@ func hasFlow(fs []pipeline.Flow, from, to string) bool {
 		}
 	}
 	return false
+}
+
+// matchingMultidevs keeps the multidevs whose name contains text, ignoring
+// case.
+func matchingMultidevs(mds []pipeline.Node, text string) []pipeline.Node {
+	text = strings.ToLower(text)
+	var out []pipeline.Node
+	for _, n := range mds {
+		if strings.Contains(strings.ToLower(n.ID), text) {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+func (m *Model) clearPipeFilter() {
+	m.pipeFilter, m.pipeFiltering, m.pipeFilterPrev = "", false, ""
+}
+
+// pipeFilterKey edits the multidev filter while its input is open. Every key
+// is taken (so letters are typed, not run as actions) except ctrl+c.
+func (m *Model) pipeFilterKey(msg tea.KeyPressMsg) tea.Cmd {
+	switch k := msg.String(); k {
+	case "ctrl+c":
+		m.jobs.CancelAll()
+		return tea.Quit
+	case "esc": // cancel: no filter, selection back where it was
+		prev := m.pipeFilterPrev
+		m.clearPipeFilter()
+		return m.selectEnv(prev)
+	case "enter":
+		m.pipeFiltering = false
+		return nil
+	case "backspace":
+		if r := []rune(m.pipeFilter); len(r) > 0 {
+			m.pipeFilter = string(r[:len(r)-1])
+		}
+	default:
+		t := msg.Text
+		if t == "" || t == " " || strings.ContainsFunc(t, unicode.IsControl) {
+			return nil
+		}
+		m.pipeFilter += t
+	}
+	// Follow the first match as the filter narrows.
+	if mds := m.pipelineGraph().Multidevs; len(mds) > 0 {
+		return m.selectEnv(mds[0].ID)
+	}
+	return nil
 }
 
 // pipelineFooter explains the selected environment under the graph.
@@ -577,7 +632,15 @@ func (m *Model) renderPipeline(w, h int) string {
 			title = " Pipeline · " + s + " · " + env + " "
 		}
 	}
-	hint := fmt.Sprintf(" ←/→ select · enter actions · %s deploy · %s open · %s/esc back ", m.keys.Key(ActDeploy), m.keys.Key(ActOpenURL), m.keys.Key(ActPipeline))
+	var hint string
+	switch {
+	case m.pipeFiltering:
+		hint = " type to filter multidevs · enter keep · esc cancel "
+	case m.pipeFilter != "":
+		hint = fmt.Sprintf(" ←/→ select · enter actions · %s deploy · / edit filter · esc clear filter ", m.keys.Key(ActDeploy))
+	default:
+		hint = fmt.Sprintf(" ←/→ select · enter actions · %s deploy · %s open · / filter · %s/esc back ", m.keys.Key(ActDeploy), m.keys.Key(ActOpenURL), m.keys.Key(ActPipeline))
+	}
 	m.zones.footer(hint, 0, h-1, w)
 	return panels.Box(title, lines, w, h, true, hint)
 }
@@ -617,7 +680,14 @@ func (m *Model) pipelineKey(k string) (tea.Cmd, bool) {
 		return m.selectEnv(order[next])
 	}
 	switch k {
+	case "/":
+		m.pipeFiltering, m.pipeFilterPrev = true, m.selectedEnv()
+		return nil, true
 	case "esc":
+		if m.pipeFilter != "" { // first esc clears the filter, keeping the selection
+			m.clearPipeFilter()
+			return nil, true
+		}
 		m.showPipeline = false
 		return nil, true
 	// No h/l here: l is the clone-content key, and action keys must mean the

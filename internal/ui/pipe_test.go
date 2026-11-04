@@ -64,16 +64,23 @@ func TestPipelineNeverOverflows(t *testing.T) {
 	h.waitText("sftp ↑1 ✎2")
 	m := h.final()
 	m.showPipeline = true
-	for _, sz := range [][2]int{{30, 8}, {60, 20}, {80, 24}, {99, 30}, {100, 30}, {140, 40}, {220, 60}} {
-		mm := m
-		mm.width, mm.height = sz[0], sz[1]
-		lines := strings.Split(ansi.Strip(mm.render()), "\n")
-		if len(lines) > sz[1] {
-			t.Errorf("%v: %d lines", sz, len(lines))
-		}
-		for i, l := range lines {
-			if w := ansi.StringWidth(l); w > sz[0] {
-				t.Errorf("%v line %d is %d wide", sz, i, w)
+	for _, filter := range []string{"", "proj", "a-very-long-multidev-filter", "zzz"} {
+		for _, sz := range [][2]int{{30, 8}, {60, 20}, {80, 24}, {99, 30}, {100, 30}, {140, 40}, {220, 60}} {
+			mm := m
+			mm.pipeFilter = filter
+			mm.width, mm.height = sz[0], sz[1]
+			screen := ansi.Strip(mm.render())
+			lines := strings.Split(screen, "\n")
+			if len(lines) > sz[1] {
+				t.Errorf("%q %v: %d lines", filter, sz, len(lines))
+			}
+			for i, l := range lines {
+				if w := ansi.StringWidth(l); w > sz[0] {
+					t.Errorf("%q %v line %d is %d wide", filter, sz, i, w)
+				}
+			}
+			if filter == "zzz" && sz[1] >= 30 && !strings.Contains(screen, "no multidevs match") {
+				t.Errorf("%v: no-match message missing:\n%s", sz, screen)
 			}
 		}
 	}
@@ -172,4 +179,58 @@ func TestDescribeStep(t *testing.T) {
 	if _, ok := describeStep([]string{"site:list"}); ok {
 		t.Error("no site.env: not an environment step")
 	}
+}
+
+// / filters the pipeline's multidevs by name until esc, and says so.
+func TestPipelineFilterMultidevs(t *testing.T) {
+	h := openPipelineOn(t, testMock(t), "dev")
+	h.waitText("annual")
+	h.keys("/")
+	h.typeText("PROJ") // case-insensitive
+	h.waitText("MULTIDEVS · /PROJ▏ · 3 of 9")
+	h.waitText("Pipeline · acme-web · proj-19") // first match selected while typing
+	h.keys("enter")
+	h.waitText("MULTIDEVS · /PROJ · 3 of 9")
+	h.waitText("esc clear filter")
+	if s := h.screen(); strings.Contains(s, "annual") || strings.Contains(s, "contact-us") {
+		t.Fatalf("non-matching multidevs still shown:\n%s", s)
+	}
+	h.keys("right") // moves among matches only
+	h.waitText("Pipeline · acme-web · proj-29")
+	h.keys("enter") // keys act on the selection, not typed into the filter
+	h.waitText("› c  Clear cache")
+	h.keys("esc")
+	h.waitText("MULTIDEVS · /PROJ · 3 of 9")
+
+	h.keys("/", "backspace", "backspace", "backspace", "backspace")
+	h.typeText("zzz")
+	h.keys("enter")
+	h.waitText(`no multidevs match "zzz"`)
+	h.keys("/", "backspace", "backspace", "backspace")
+	h.typeText("proj-19")
+	h.keys("enter")
+	h.waitText("/proj-19 · 1 of 9") // too long for the column with the MULTIDEVS prefix
+
+	h.keys("esc")            // first esc clears the filter, keeps the selection
+	h.waitText("newsletter") // the full list is back, scrolled to proj-19
+	h.waitText("Pipeline · acme-web · proj-19")
+	if strings.Contains(h.screen(), "of 9") {
+		t.Fatal("filter heading still shown after esc")
+	}
+	h.keys("esc") // second esc leaves the pipeline
+	h.waitText("[3] acme-web.proj-19")
+}
+
+// esc while typing cancels: no filter, selection back where it was.
+func TestPipelineFilterCancel(t *testing.T) {
+	h := openPipelineOn(t, testMock(t), "dev")
+	h.waitText("annual")
+	h.keys("/")
+	h.typeText("feed")
+	h.waitText("Pipeline · acme-web · feedback")
+	h.keys("esc")
+	h.waitText("Pipeline · acme-web · dev")
+	h.waitText("annual")
+	h.keys("esc")
+	h.waitText("[3] acme-web.dev")
 }
