@@ -175,7 +175,29 @@ func ParseDiffstat(data []byte) ([]DiffstatEntry, error) {
 func ParseWorkflows(data []byte) ([]Workflow, error) {
 	wfs, err := rowsOnly[Workflow](data)
 	sort.SliceStable(wfs, func(i, j int) bool { return wfs[i].StartedAt > wfs[j].StartedAt })
+	markSuperseded(wfs)
 	return wfs, err
+}
+
+// markSuperseded retires workflows Pantheon left "running" after a later
+// workflow on the same env started and finished. Pantheon runs one workflow
+// per env at a time, so the earlier one is dead (the dashboard hides it).
+// Site-level workflows have no env and are left alone. wfs is newest first.
+func markSuperseded(wfs []Workflow) {
+	finishedAfter := map[string]bool{} // env → a newer workflow has finished
+	for i := range wfs {
+		env := wfs[i].EnvName()
+		if env == "" {
+			continue
+		}
+		if wfs[i].Running() {
+			if finishedAfter[env] {
+				wfs[i].Status = StatusSuperseded
+			}
+			continue
+		}
+		finishedAfter[env] = true
+	}
 }
 
 // ParseWorkflow parses workflow:info:status output.
