@@ -454,6 +454,13 @@ func Workflows(d WorkflowsData, l *List, width, height int, focused bool) []stri
 		if w.Running() {
 			continue
 		}
+		if w.Status == terminus.StatusSuperseded {
+			// Pantheon never recorded an outcome; a later workflow replaced it.
+			right := " " + envOrSite(w) + " · never finished · " + Ago(w.StartedAt.Time(), d.Now)
+			desc := Fit(w.Workflow, max(width-2-lipgloss.Width(right)-2, 8))
+			lines = append(lines, theme.MutedText.Render(theme.SymUnknown+" "+desc+right))
+			continue
+		}
 		sym := theme.OK.Render(theme.SymSuccess)
 		if w.Status == terminus.StatusFailed {
 			sym = theme.Fail.Render(theme.SymFailed)
