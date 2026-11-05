@@ -180,23 +180,27 @@ func ParseWorkflows(data []byte) ([]Workflow, error) {
 }
 
 // markSuperseded retires workflows Pantheon left "running" after a later
-// workflow on the same env started and finished. Pantheon runs one workflow
-// per env at a time, so the earlier one is dead (the dashboard hides it).
-// Site-level workflows have no env and are left alone. wfs is newest first.
+// workflow of the same kind on the same env started and finished: a second
+// code sync finishing means the first is dead (the dashboard hides it).
+// Different kinds do overlap on one env (every deploy runs an Edge sync that
+// finishes inside it), so only the same description counts. Site-level
+// workflows have no env and are left alone. wfs is newest first.
 func markSuperseded(wfs []Workflow) {
-	finishedAfter := map[string]bool{} // env → a newer workflow has finished
+	type kind struct{ env, workflow string }
+	finishedAfter := map[kind]bool{} // a newer workflow of this kind has finished
 	for i := range wfs {
 		env := wfs[i].EnvName()
 		if env == "" {
 			continue
 		}
+		k := kind{env, wfs[i].Workflow}
 		if wfs[i].Running() {
-			if finishedAfter[env] {
+			if finishedAfter[k] {
 				wfs[i].Status = StatusSuperseded
 			}
 			continue
 		}
-		finishedAfter[env] = true
+		finishedAfter[k] = true
 	}
 }
 

@@ -157,8 +157,8 @@ const (
 	StatusSucceeded = "succeeded"
 	StatusFailed    = "failed"
 	// StatusSuperseded is set by ParseWorkflows, never by Terminus: the
-	// workflow still reports "running" but a later one on the same env has
-	// finished, so Pantheon lost track of it.
+	// workflow still reports "running" but a later one of the same kind on the
+	// same env has finished, so Pantheon lost track of it.
 	StatusSuperseded = "superseded"
 )
 
