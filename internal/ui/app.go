@@ -459,6 +459,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m.handleKey(msg)
 
+	case tea.PasteMsg:
+		// A terminal paste (bracketed) arrives whole, not as key presses.
+		if m.modal != nil {
+			done, cmd := m.modal.update(&m, msg)
+			if done {
+				m.modal = nil
+			}
+			return m, cmd
+		}
+		return m, nil
+
 	case jobs.StepMsg, jobs.LineMsg, jobs.DoneMsg:
 		return m, m.onJobMsg(msg)
 
