@@ -77,6 +77,39 @@ type Graph struct {
 	Main      []Node // dev, test, live (whichever exist, in that order)
 	Edges     []Edge
 	Flows     []Flow
+	// Filter is set while the multidevs are narrowed by name (/); Multidevs
+	// then holds only the matches.
+	Filter *Filter
+}
+
+// Filter describes a name filter on the multidev column.
+type Filter struct {
+	Text   string
+	Typing bool // the input is open
+	Total  int  // multidevs before filtering
+}
+
+// mdHeading labels the multidev column, saying when it is filtered. When
+// that doesn't fit in w it drops base, so the filter and count stay readable.
+func (g Graph) mdHeading(base string, w int) string {
+	f := g.Filter
+	if f == nil {
+		return base
+	}
+	text := "/" + f.Text
+	if f.Typing {
+		text += "▏"
+	}
+	short := fmt.Sprintf("%s · %d of %d", text, len(g.Multidevs), f.Total)
+	if full := base + " · " + short; len([]rune(full)) <= w {
+		return full
+	}
+	return short
+}
+
+// noMatch is shown in place of the multidevs when the filter matches none.
+func (g Graph) noMatch() string {
+	return fmt.Sprintf("no multidevs match %q", g.Filter.Text)
 }
 
 // Order is the selection order: multidevs, then dev, test, live.
@@ -309,7 +342,7 @@ func window(mds []Node, n int, sel string) (shown []Node, more int) {
 func renderWide(cv *canvas, s styles, g Graph, sel string, frame int) {
 	w, h := cv.w, cv.h
 	mdW, trunk := 0, 0
-	if len(g.Multidevs) > 0 {
+	if len(g.Multidevs) > 0 || g.Filter != nil {
 		mdW, trunk = min(max(w/6, 18), 24), 5
 	}
 	const gap = 8
@@ -367,7 +400,14 @@ func renderWide(cv *canvas, s styles, g Graph, sel string, frame int) {
 		}
 	}
 	if mdW > 0 {
-		cv.text(0, 0, "MULTIDEVS", mdW, s.muted)
+		if g.Filter != nil {
+			cv.text(0, 0, g.mdHeading("MULTIDEVS", mdW+trunk), mdW+trunk, s.accent)
+			if len(g.Multidevs) == 0 {
+				cv.text(1, 1, g.noMatch(), mdW+trunk, s.muted)
+			}
+		} else {
+			cv.text(0, 0, "MULTIDEVS", mdW, s.muted)
+		}
 		slots := max((h-1)/mdBoxH, 0)
 		shown, more := window(g.Multidevs, slots, sel)
 		tx := mdW + 1
@@ -429,9 +469,17 @@ func renderNarrow(cv *canvas, s styles, g Graph, sel string, frame int) {
 	bw := min(w, 52)
 	y := 0
 	needMain := len(g.Main)*boxH + max(len(g.Main)-1, 0)*3
-	if len(g.Multidevs) > 0 {
+	if len(g.Multidevs) > 0 || g.Filter != nil {
 		rows := max(min(len(g.Multidevs), h-needMain-1), 0)
-		cv.text(0, y, "MULTIDEVS → dev", bw, s.muted)
+		if g.Filter != nil {
+			cv.text(0, y, g.mdHeading("MULTIDEVS → dev", bw), bw, s.accent)
+			if len(g.Multidevs) == 0 {
+				y++
+				cv.text(2, y, g.noMatch(), bw, s.muted)
+			}
+		} else {
+			cv.text(0, y, "MULTIDEVS → dev", bw, s.muted)
+		}
 		y++
 		shown, more := window(g.Multidevs, rows, sel)
 		for _, m := range shown {

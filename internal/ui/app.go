@@ -115,10 +115,15 @@ type Model struct {
 	historyOffset      int
 
 	showPipeline bool
-	frame        int
-	animating    bool
-	landed       map[string]map[string]landing
-	started      time.Time
+	// The pipeline's multidev name filter (/). It applies while typing or
+	// while pipeFilter is set, until esc.
+	pipeFilter     string
+	pipeFiltering  bool   // the / input is open
+	pipeFilterPrev string // selection before /, restored on cancel
+	frame          int
+	animating      bool
+	landed         map[string]map[string]landing
+	started        time.Time
 
 	localLog []terminus.Logged // the history log, oldest first
 
@@ -383,6 +388,7 @@ func (m *Model) selectSite(i int) tea.Cmd {
 		return nil
 	}
 	m.siteList.Cursor = i
+	m.clearPipeFilter()
 	m.envList = panels.List{}
 	m.wfList = panels.List{}
 	m.detailOffset = 0
@@ -777,6 +783,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.showHistory {
 		return m, m.historyKey(k)
 	}
+	if m.showPipeline && m.pipeFiltering {
+		return m, m.pipeFilterKey(msg)
+	}
 	if m.showPipeline {
 		if cmd, ok := m.pipelineKey(k); ok {
 			return m, cmd
@@ -806,6 +815,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.showHistory, m.historyOffset = true, 0
 	case ActPipeline:
 		m.showPipeline = !m.showPipeline
+		m.clearPipeFilter()
 		if m.showPipeline && m.selectedEnv() == "" {
 			return m, tea.Batch(m.selectEnv("dev"), m.startAnim())
 		}
