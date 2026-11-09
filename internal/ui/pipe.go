@@ -473,8 +473,8 @@ func (m *Model) pipelineFooter(width, maxLines int) []string {
 		add(theme.Warn.Render(line))
 	}
 	if r := m.runOn(site, env); r != nil {
-		add(theme.Warn.Render(fmt.Sprintf("%s %s on %s, in the background for %s", theme.SymRunning, runWhat(r), env,
-			m.now().Sub(r.Started).Round(time.Second))) +
+		add(m.spinner.View() + " " + theme.Shimmer(fmt.Sprintf("%s on %s, in the background for %s", runWhat(r), env,
+			m.now().Sub(r.Started).Round(time.Second)), m.pulse) +
 			theme.MutedText.Render(fmt.Sprintf(" · keeps going if you quit · %s shows output", m.keys.Key(ActOutput))))
 	}
 	if l, ok := m.recentLanding(site, env); ok {

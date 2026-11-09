@@ -60,6 +60,9 @@ const (
 
 var panelNames = [numPanels]string{"Sites", "Environments", "Detail", "Workflows"}
 
+// loadingSites is the status until site:list returns.
+const loadingSites = "Loading sites…"
+
 // Model is the root model.
 type Model struct {
 	opts   Options
@@ -83,6 +86,7 @@ type Model struct {
 	spinner  spinner.Model
 	bar      progress.Model
 	spinning bool
+	pulse    int // spinner ticks so far; drives the shimmer on running lines
 
 	status      string
 	statusErr   bool
@@ -139,7 +143,7 @@ func New(opts Options) Model {
 		bar: progress.New(progress.WithColors(theme.Amber, theme.Green), progress.WithoutPercentage(),
 			progress.WithFillCharacters('█', '░')),
 		outputView: viewport.New(),
-		status:     "Loading sites…",
+		status:     loadingSites,
 		jobs:       jobs.New(opts.Runner),
 		afterJob:   map[int]func(*Model) tea.Cmd{}, afterJobWhat: map[int]string{},
 		landed: map[string]map[string]landing{},
@@ -510,6 +514,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.spinning = false
 			return m, nil
 		}
+		m.pulse++
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
@@ -538,6 +543,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(m.startSpinner(), m.startAnim())
 
 	case sitesLoadedMsg:
+		first := !m.sitesLoaded
 		m.sitesLoaded = true
 		if msg.err != nil {
 			m.sitesErr = msg.err
@@ -557,7 +563,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.setStatus("No sites found (check the sites allowlist in "+m.cfg.Path+")", true)
 			return m, nil
 		}
-		m.setStatus(fmt.Sprintf("%d sites", len(sites)), false)
+		if !first || m.status == "" || m.status == loadingSites { // at startup, keep a notice already showing (runs that ended while closed)
+			m.setStatus(fmt.Sprintf("%d sites", len(sites)), false)
+		}
 		want := prev
 		if want == "" {
 			want = m.opts.Site

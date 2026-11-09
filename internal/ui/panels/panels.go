@@ -404,12 +404,13 @@ func short(h string) string {
 
 // JobRow is a local background job (a Terminus process lazyterminus started).
 type JobRow struct {
-	Title   string
-	Running bool
-	Failed  bool
-	Err     string
-	Started time.Time
-	Ended   time.Time
+	Title      string
+	Background bool // detached; keeps running if lazyterminus quits
+	Running    bool
+	Failed     bool
+	Err        string
+	Started    time.Time
+	Ended      time.Time
 }
 
 // WorkflowsData is everything the Workflows panel shows.
@@ -418,6 +419,7 @@ type WorkflowsData struct {
 	Workflows []terminus.Workflow
 	Progress  map[string][2]int // workflow id → done,total
 	Spinner   string
+	Frame     int // animation frame for running background rows
 	Bar       progress.Model
 	Now       time.Time
 	Status    string // shown when there is nothing else
@@ -429,6 +431,8 @@ func Workflows(d WorkflowsData, l *List, width, height int, focused bool) []stri
 	var lines []string
 	for _, j := range d.Jobs {
 		switch {
+		case j.Running && j.Background:
+			lines = append(lines, theme.Warn.Render(d.Spinner)+" "+theme.Shimmer(j.Title, d.Frame)+theme.MutedText.Render(" · "+d.Now.Sub(j.Started).Round(time.Second).String()))
 		case j.Running:
 			lines = append(lines, theme.Warn.Render(d.Spinner)+" "+j.Title+theme.MutedText.Render(" · job · "+d.Now.Sub(j.Started).Round(time.Second).String()))
 		case j.Failed:
