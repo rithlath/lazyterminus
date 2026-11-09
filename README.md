@@ -106,6 +106,7 @@ On the selected environment:
 | `u` | upstream updates (shown in Output) | `upstream:updates:list` |
 | `v` | open in the browser (primary custom domain, else `*.pantheonsite.io`) | `domain:list` |
 | `y` | copy that URL to the clipboard (right-click a URL in the pipeline to copy that one) | — |
+| `P` | open the environment in the Pantheon dashboard | — |
 
 Rebind anything in the config under `keymap:` using the action names shown in
 `?` help.
@@ -122,7 +123,12 @@ to run it, a palette entry to choose it, or a form field to focus it (toggles
 flip, choices advance). A click outside a dialog cancels it, and the wheel
 moves the selection as before.
 
-While lazyterminus has the mouse, hold Shift to select and copy text.
+Drag with the left button to highlight text; letting go copies it to the
+clipboard, and a notice in the corner says what was copied. A selection stays
+inside the panel, pipeline or dialog it started in, so panel borders and the
+panel beside it aren't copied. Because of this, a left click acts when you let
+go, and only if the mouse didn't move. Hold Shift to use the terminal's own
+selection instead.
 
 ### Action menu
 
@@ -165,7 +171,7 @@ backup", "waking", "switching to git", then "✓ cache cleared · just now" for
 a few minutes, or "✗ creating backup failed" with the error underneath.
 Under the graph, the selected environment's URLs come first (platform
 domain and any custom domains; click one to open it or right-click to copy
-it, or press `v` to open or `y` to copy the primary), then what's waiting to deploy, then its recent commits with author
+it, or press `v` to open or `y` to copy the primary, or `P` for its Pantheon dashboard page), then what's waiting to deploy, then its recent commits with author
 and age.
 
 Cloning content draws an arc over the boxes from source to target

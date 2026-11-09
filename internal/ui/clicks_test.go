@@ -15,7 +15,72 @@ import (
 func (h *harness) clickAt(x, y int, b tea.MouseButton) {
 	time.Sleep(100 * time.Millisecond)
 	h.tm.Send(tea.MouseClickMsg{X: x, Y: y, Button: b})
+	h.tm.Send(tea.MouseReleaseMsg{X: x, Y: y, Button: b})
 	time.Sleep(20 * time.Millisecond)
+}
+
+// drag presses at (x0, y0), moves to (x1, y1) and releases there.
+func (h *harness) drag(x0, y0, x1, y1 int) {
+	time.Sleep(100 * time.Millisecond)
+	h.tm.Send(tea.MouseClickMsg{X: x0, Y: y0, Button: tea.MouseLeft})
+	h.tm.Send(tea.MouseMotionMsg{X: x1, Y: y1, Button: tea.MouseLeft})
+	h.tm.Send(tea.MouseReleaseMsg{X: x1, Y: y1, Button: tea.MouseLeft})
+	time.Sleep(20 * time.Millisecond)
+}
+
+// find is where text first appears on screen.
+func (h *harness) find(text string) (x, y int) {
+	h.t.Helper()
+	for y, line := range strings.Split(h.screen(), "\n") {
+		if i := strings.Index(line, text); i >= 0 {
+			return ansi.StringWidth(line[:i]), y
+		}
+	}
+	h.t.Fatalf("%q not on screen:\n%s", text, h.screen())
+	return 0, 0
+}
+
+func TestDragSelectsAndCopiesText(t *testing.T) {
+	copied := &opened{}
+	h := start(t, Options{Site: "acme-web", Env: "acme-web.live", Clipboard: copied.open}, 140, 44)
+	h.waitText("(primary)")
+	x, y := h.find("https://www.acme-web.example.com (primary)")
+	h.drag(x, y, x+len("https://www.acme-web.example.com")-1, y)
+	h.waitText(`Copied "https://www.acme-web.example.com" to the clipboard`)
+	if got := copied.last(); got != "https://www.acme-web.example.com" {
+		t.Errorf("copied %q", got)
+	}
+	if h.root().focus != panelEnvs {
+		t.Error("a drag should not run the click under it")
+	}
+
+	// Down a row, past the right edge: clipped to the Detail box (no
+	// border, nothing from the panel beside it).
+	h.drag(x, y, 139, y+1)
+	h.waitFor("two lines copied", func(string) bool { return strings.Count(copied.last(), "\n") == 1 })
+	for _, l := range strings.Split(copied.last(), "\n") {
+		if strings.ContainsAny(l, "│╭╮╰╯") {
+			t.Errorf("selection crossed a border: %q", l)
+		}
+	}
+	if !strings.HasPrefix(copied.last(), "https://www.acme-web.example.com (primary)") {
+		t.Errorf("copied %q", copied.last())
+	}
+	h.waitText("Copied 2 lines")
+}
+
+func TestClickWithoutDragStillClicks(t *testing.T) {
+	h := start(t, Options{Site: "acme-web", Env: "acme-web.dev"}, 130, 40)
+	h.waitText("[3] acme-web.dev")
+	x, y := h.find("live        git")
+	time.Sleep(100 * time.Millisecond) // as clickAt: let the frame with that row reach the renderer
+	h.tm.Send(tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
+	time.Sleep(50 * time.Millisecond)
+	if strings.Contains(h.screen(), "[3] acme-web.live") {
+		t.Fatal("a left click acted before release")
+	}
+	h.tm.Send(tea.MouseReleaseMsg{X: x, Y: y, Button: tea.MouseLeft})
+	h.waitText("[3] acme-web.live")
 }
 
 // clickOn clicks text on the first screen line that contains both anchor

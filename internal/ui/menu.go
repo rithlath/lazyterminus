@@ -36,7 +36,7 @@ func (m *Model) envMenuItems(site string, e *terminus.Env) []menuItem {
 	st := m.state(site)
 	readOnly := m.cfg.ReadOnly
 	item := func(action, label, disabled string) menuItem {
-		if readOnly && disabled == "" && action != ActUpstream && action != ActOpenURL && action != ActCopyURL && action != menuPalette {
+		if readOnly && disabled == "" && action != ActUpstream && action != ActOpenURL && action != ActCopyURL && action != ActDashboard && action != menuPalette {
 			disabled = "read_only is on"
 		}
 		return menuItem{action: action, label: label, disabled: disabled}
@@ -113,6 +113,11 @@ func (m *Model) envMenuItems(site string, e *terminus.Env) []menuItem {
 		items = append(items, item(ActOpenURL, "Open "+urls[0]+" in browser", ""), item(ActCopyURL, "Copy "+urls[0], ""))
 	} else {
 		items = append(items, item(ActOpenURL, "Open in browser", "no domain yet"), item(ActCopyURL, "Copy URL", "no domain yet"))
+	}
+	if m.siteID(site) != "" {
+		items = append(items, item(ActDashboard, "Open "+e.ID+" in the Pantheon dashboard", ""))
+	} else {
+		items = append(items, item(ActDashboard, "Open in the Pantheon dashboard", "site ID unknown"))
 	}
 	items = append(items, item(menuPalette, "More Terminus commands for "+e.ID+"…", ""))
 	// Available first, then the rest, keeping each group's order.

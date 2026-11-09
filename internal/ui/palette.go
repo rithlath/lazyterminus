@@ -127,9 +127,13 @@ func (p *paletteModal) refresh() {
 
 func (p *paletteModal) update(m *Model, msg tea.Msg) (bool, tea.Cmd) {
 	key, ok := msg.(tea.KeyPressMsg)
-	if !ok {
+	if !ok { // e.g. a paste
+		before := p.input.Value()
 		var cmd tea.Cmd
 		p.input, cmd = p.input.Update(msg)
+		if p.input.Value() != before {
+			p.refresh()
+		}
 		return false, cmd
 	}
 	switch key.String() {

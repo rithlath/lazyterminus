@@ -25,8 +25,8 @@ type (
 		err error
 	}
 	copiedMsg struct {
-		url string
-		err error // nil: copied with a system tool; else only sent to the terminal
+		what string // the URL, or a description of copied text
+		err  error  // nil: copied with a system tool; else only sent to the terminal
 	}
 )
 
@@ -125,6 +125,36 @@ func (m *Model) onOpened(msg openedMsg) {
 	m.setStatus("Opened "+msg.url+" in your browser.", false)
 }
 
+// dashboardURL is the environment's page in the Pantheon dashboard, as
+// `terminus dashboard:view --print` gives it (siteID is the site's UUID).
+func dashboardURL(siteID, env string) string {
+	return "https://dashboard.pantheon.io/site-redirect/" + siteID + "/environment/" + env + "/"
+}
+
+// siteID is the UUID of the named site, or "" if it isn't listed.
+func (m *Model) siteID(name string) string {
+	for _, s := range m.sites {
+		if s.Name == name {
+			return s.ID
+		}
+	}
+	return ""
+}
+
+// openEnvDashboard opens the selected environment in the Pantheon dashboard.
+func (m *Model) openEnvDashboard() tea.Cmd {
+	site, e, ok := m.target()
+	if !ok {
+		return nil
+	}
+	id := m.siteID(site)
+	if id == "" {
+		m.setStatus("No site ID for "+site+" (press r on Sites to reload).", true)
+		return nil
+	}
+	return m.openURL(dashboardURL(id, e.ID))
+}
+
 // copyEnvURL copies the selected environment's main URL (the one the open
 // key opens).
 func (m *Model) copyEnvURL() tea.Cmd {
@@ -143,20 +173,24 @@ func (m *Model) copyEnvURL() tea.Cmd {
 // copyURL puts url on the clipboard two ways: OSC 52 through the terminal,
 // and the system's copy tool, since tmux or the terminal may not pass OSC
 // 52 on.
-func (m *Model) copyURL(url string) tea.Cmd {
+func (m *Model) copyURL(url string) tea.Cmd { return m.copyText(url, url) }
+
+// copyText copies s; what names it in the status line and toast.
+func (m *Model) copyText(s, what string) tea.Cmd {
 	cp := m.opts.Clipboard
 	if cp == nil {
 		cp = systemClipboard
 	}
-	return tea.Batch(tea.SetClipboard(url), func() tea.Msg { return copiedMsg{url: url, err: cp(url)} })
+	return tea.Batch(tea.SetClipboard(s), func() tea.Msg { return copiedMsg{what: what, err: cp(s)} })
 }
 
-func (m *Model) onCopied(msg copiedMsg) {
+func (m *Model) onCopied(msg copiedMsg) tea.Cmd {
 	if msg.err != nil {
-		m.setStatus("Sent "+msg.url+" to the terminal's clipboard (no copy tool worked: "+msg.err.Error()+")", false)
-		return
+		m.setStatus("Sent "+msg.what+" to the terminal's clipboard (no copy tool worked: "+msg.err.Error()+")", false)
+		return m.showToast("Sent "+msg.what+" to the terminal's clipboard", true)
 	}
-	m.setStatus("Copied "+msg.url+" to the clipboard.", false)
+	m.setStatus("Copied "+msg.what+" to the clipboard.", false)
+	return m.showToast("Copied "+msg.what+" to the clipboard", false)
 }
 
 // systemClipboard copies s with the platform's tool: clip.exe under WSL,
@@ -269,6 +303,9 @@ func (m *Model) urlLine(width int) (string, []urlSpan) {
 	}
 	if k := m.keys.Key(ActOpenURL); k != "" && k != "—" {
 		line += theme.MutedText.Render("   " + k + " or click to open · " + m.keys.Key(ActCopyURL) + " or right-click to copy")
+		if d := m.keys.Key(ActDashboard); d != "" && d != "—" {
+			line += theme.MutedText.Render(" · " + d + " dashboard")
+		}
 	}
 	return line, spans
 }

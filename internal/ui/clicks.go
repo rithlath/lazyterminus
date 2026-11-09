@@ -56,7 +56,16 @@ func (z zone) contains(x, y int) bool {
 // zoneList collects one frame's zones. Render copies of the model share it;
 // a nil list (rendering outside View) records nothing. The first zone
 // containing a click wins, so rows go before the panel around them.
-type zoneList struct{ list []zone }
+type zoneList struct {
+	list  []zone
+	boxes []rect // bordered boxes, which bound a text selection
+}
+
+func (z *zoneList) box(x, y, w, h int) {
+	if z != nil && w > 2 && h > 2 {
+		z.boxes = append(z.boxes, rect{x, y, w, h})
+	}
+}
 
 func (z *zoneList) add(x, y, w, h int, t clickTarget) {
 	if z != nil && w > 0 && h > 0 {
@@ -66,7 +75,7 @@ func (z *zoneList) add(x, y, w, h int, t clickTarget) {
 
 func (z *zoneList) reset() {
 	if z != nil {
-		z.list = z.list[:0]
+		z.list, z.boxes = z.list[:0], z.boxes[:0]
 	}
 }
 
@@ -103,8 +112,18 @@ func hintKey(seg string) string {
 	return ""
 }
 
-// onMouse builds the frame's mouse handler.
-func onMouse(zs []zone) func(tea.MouseMsg) tea.Cmd {
+// onMouse builds the frame's mouse handler. A right click acts on press; a
+// left click on release, unless the mouse moved, which selects text.
+func onMouse(zs *zoneList, ms *mouseState, width, height int) func(tea.MouseMsg) tea.Cmd {
+	hit := func(x, y int, right bool) *clickMsg {
+		for _, z := range zs.list {
+			if z.contains(x, y) {
+				return &clickMsg{t: z.t, right: right}
+			}
+		}
+		return nil
+	}
+	send := func(msg tea.Msg) tea.Cmd { return func() tea.Msg { return msg } }
 	return func(msg tea.MouseMsg) tea.Cmd {
 		switch msg := msg.(type) {
 		case tea.MouseWheelMsg:
@@ -118,14 +137,37 @@ func onMouse(zs []zone) func(tea.MouseMsg) tea.Cmd {
 			}
 		case tea.MouseClickMsg:
 			mo := msg.Mouse()
-			if mo.Button != tea.MouseLeft && mo.Button != tea.MouseRight {
+			switch mo.Button {
+			case tea.MouseRight:
+				ms.pressed = false
+				if c := hit(mo.X, mo.Y, true); c != nil {
+					return send(*c)
+				}
+			case tea.MouseLeft:
+				ms.press(mo.X, mo.Y, hit(mo.X, mo.Y, false), zs.boxes, width, height)
+				ms.seq++
+				return send(selectMsg{clear: true, seq: ms.seq})
+			}
+		case tea.MouseMotionMsg:
+			mo := msg.Mouse()
+			if !ms.pressed || !ms.dragging && ms.clip.clamp(mo.X, mo.Y) == ms.anchor {
 				return nil
 			}
-			for _, z := range zs {
-				if z.contains(mo.X, mo.Y) {
-					c := clickMsg{t: z.t, right: mo.Button == tea.MouseRight}
-					return func() tea.Msg { return c }
-				}
+			ms.dragging = true
+			ms.seq++
+			return send(selectMsg{sel: ms.span(mo.X, mo.Y), seq: ms.seq})
+		case tea.MouseReleaseMsg:
+			if !ms.pressed {
+				return nil
+			}
+			ms.pressed = false
+			mo := msg.Mouse()
+			if ms.dragging {
+				ms.seq++
+				return send(selectMsg{sel: ms.span(mo.X, mo.Y), done: true, seq: ms.seq})
+			}
+			if ms.pending != nil {
+				return send(*ms.pending)
 			}
 		}
 		return nil

@@ -39,6 +39,7 @@ const (
 	ActUpstream       = "upstream_updates"
 	ActOpenURL        = "open_url"
 	ActCopyURL        = "copy_url"
+	ActDashboard      = "dashboard"
 )
 
 type binding struct {
@@ -80,6 +81,7 @@ var defaultBindings = []binding{
 	{ActUpstream, []string{"u"}, "upstream updates", "Environment"},
 	{ActOpenURL, []string{"v"}, "open in browser", "Environment"},
 	{ActCopyURL, []string{"y"}, "copy URL", "Environment"},
+	{ActDashboard, []string{"P"}, "open in Pantheon dashboard", "Environment"},
 }
 
 // KeyMap resolves key presses to actions.
