@@ -73,6 +73,7 @@ func TestClickWithoutDragStillClicks(t *testing.T) {
 	h := start(t, Options{Site: "acme-web", Env: "acme-web.dev"}, 130, 40)
 	h.waitText("[3] acme-web.dev")
 	x, y := h.find("live        git")
+	time.Sleep(100 * time.Millisecond) // as clickAt: let the frame with that row reach the renderer
 	h.tm.Send(tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
 	time.Sleep(50 * time.Millisecond)
 	if strings.Contains(h.screen(), "[3] acme-web.live") {
