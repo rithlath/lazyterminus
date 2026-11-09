@@ -486,6 +486,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, cmd
 		}
+		if m.showPipeline && m.pipeFiltering {
+			return m, m.pipeFilterPaste(msg.Content)
+		}
 		return m, nil
 
 	case jobs.StepMsg, jobs.LineMsg, jobs.DoneMsg:

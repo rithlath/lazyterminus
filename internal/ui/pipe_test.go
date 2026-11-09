@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/rithlath/lazyterminus/internal/terminus"
@@ -222,6 +223,15 @@ func TestPipelineFilterMultidevs(t *testing.T) {
 }
 
 // esc while typing cancels: no filter, selection back where it was.
+func TestPasteIntoPipelineFilter(t *testing.T) {
+	h := openPipelineOn(t, testMock(t), "dev")
+	h.waitText("annual")
+	h.keys("/")
+	h.tm.Send(tea.PasteMsg{Content: "proj-2\nignored"}) // first line only
+	h.waitText("/proj-2▏ · 1 of 9")
+	h.waitText("Pipeline · acme-web · proj-29")
+}
+
 func TestPipelineFilterCancel(t *testing.T) {
 	h := openPipelineOn(t, testMock(t), "dev")
 	h.waitText("annual")

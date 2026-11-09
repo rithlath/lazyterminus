@@ -484,6 +484,26 @@ func (m *Model) pipeFilterKey(msg tea.KeyPressMsg) tea.Cmd {
 	return nil
 }
 
+// pipeFilterPaste adds pasted text to the multidev filter (first line only,
+// control characters dropped).
+func (m *Model) pipeFilterPaste(s string) tea.Cmd {
+	s, _, _ = strings.Cut(s, "\n")
+	s = strings.TrimSpace(strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return -1
+		}
+		return r
+	}, s))
+	if s == "" {
+		return nil
+	}
+	m.pipeFilter += s
+	if mds := m.pipelineGraph().Multidevs; len(mds) > 0 {
+		return m.selectEnv(mds[0].ID)
+	}
+	return nil
+}
+
 // pipelineFooter explains the selected environment under the graph.
 func (m *Model) pipelineFooter(width, maxLines int) []string {
 	site, env := m.site(), m.selectedEnv()
