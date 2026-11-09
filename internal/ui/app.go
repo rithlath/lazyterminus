@@ -790,6 +790,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.openEnvURL()
 	case ActCopyURL:
 		return m, m.copyEnvURL()
+	case ActDashboard:
+		return m, m.openEnvDashboard()
 	case ActHelp:
 		m.showHelp = true
 	case ActOutput:

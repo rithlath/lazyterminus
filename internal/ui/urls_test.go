@@ -115,3 +115,14 @@ func TestCopyURL(t *testing.T) {
 		t.Errorf("right-click copied %q", got)
 	}
 }
+
+func TestDashboardKeyOpensPantheonDashboard(t *testing.T) {
+	o := &opened{}
+	h := start(t, Options{Site: "acme-web", Env: "acme-web.test", OpenURL: o.open}, 140, 44)
+	h.waitText("[3] acme-web.test")
+	h.keys("p")
+	h.waitText("P dashboard")
+	h.keys("P")
+	want := "https://dashboard.pantheon.io/site-redirect/e45307a4-ab73-256b-a2e5-c1e1a2816d0a/environment/test/"
+	h.waitFor("dashboard opened", func(string) bool { return o.last() == want })
+}

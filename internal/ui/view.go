@@ -392,7 +392,7 @@ func (m Model) hintLine() (string, []hintSpan) {
 	case m.focus == panelEnvs || m.focus == panelDetail || m.showPipeline:
 		hs = []hint{{ActSelect, "actions"}, {ActDeploy, "deploy"}, {ActClearCache, "cache"}, {ActBackup, "backup"}, {ActCloneContent, "clone"},
 			{ActConnectionMode, "mode"}, {ActWake, "wake"}, {ActDrush, "drush"}, {ActCommit, "commit"},
-			{ActCreateMultidev, "new md"}, {ActDeleteMultidev, "del md"}, {ActUpstream, "upstream"}, {ActOpenURL, "open"}, {ActCopyURL, "copy url"}}
+			{ActCreateMultidev, "new md"}, {ActDeleteMultidev, "del md"}, {ActUpstream, "upstream"}, {ActOpenURL, "open"}, {ActCopyURL, "copy url"}, {ActDashboard, "dashboard"}}
 	default:
 		hs = []hint{{ActNextPanel, "panels"}, {ActUp, "up"}, {ActDown, "down"}, {ActSelect, "select"}, {ActRefresh, "refresh"}}
 	}

@@ -125,6 +125,36 @@ func (m *Model) onOpened(msg openedMsg) {
 	m.setStatus("Opened "+msg.url+" in your browser.", false)
 }
 
+// dashboardURL is the environment's page in the Pantheon dashboard, as
+// `terminus dashboard:view --print` gives it (siteID is the site's UUID).
+func dashboardURL(siteID, env string) string {
+	return "https://dashboard.pantheon.io/site-redirect/" + siteID + "/environment/" + env + "/"
+}
+
+// siteID is the UUID of the named site, or "" if it isn't listed.
+func (m *Model) siteID(name string) string {
+	for _, s := range m.sites {
+		if s.Name == name {
+			return s.ID
+		}
+	}
+	return ""
+}
+
+// openEnvDashboard opens the selected environment in the Pantheon dashboard.
+func (m *Model) openEnvDashboard() tea.Cmd {
+	site, e, ok := m.target()
+	if !ok {
+		return nil
+	}
+	id := m.siteID(site)
+	if id == "" {
+		m.setStatus("No site ID for "+site+" (press r on Sites to reload).", true)
+		return nil
+	}
+	return m.openURL(dashboardURL(id, e.ID))
+}
+
 // copyEnvURL copies the selected environment's main URL (the one the open
 // key opens).
 func (m *Model) copyEnvURL() tea.Cmd {
@@ -269,6 +299,9 @@ func (m *Model) urlLine(width int) (string, []urlSpan) {
 	}
 	if k := m.keys.Key(ActOpenURL); k != "" && k != "—" {
 		line += theme.MutedText.Render("   " + k + " or click to open · " + m.keys.Key(ActCopyURL) + " or right-click to copy")
+		if d := m.keys.Key(ActDashboard); d != "" && d != "—" {
+			line += theme.MutedText.Render(" · " + d + " dashboard")
+		}
 	}
 	return line, spans
 }
