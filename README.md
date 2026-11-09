@@ -123,7 +123,12 @@ to run it, a palette entry to choose it, or a form field to focus it (toggles
 flip, choices advance). A click outside a dialog cancels it, and the wheel
 moves the selection as before.
 
-While lazyterminus has the mouse, hold Shift to select and copy text.
+Drag with the left button to highlight text; letting go copies it to the
+clipboard, and a notice in the corner says what was copied. A selection stays
+inside the panel, pipeline or dialog it started in, so panel borders and the
+panel beside it aren't copied. Because of this, a left click acts when you let
+go, and only if the mouse didn't move. Hold Shift to use the terminal's own
+selection instead.
 
 ### Action menu
 

@@ -93,6 +93,12 @@ type Model struct {
 	zones       *zoneList // where this frame drew clickable things (set by View)
 	lastClick   string    // last click's target, for double clicks
 	lastClickAt time.Time
+	mouse       *mouseState // the mouse gesture in progress (owned by View's handler)
+	sel         *selection  // highlighted text
+	selSeq      int
+	toast       string // brief notice in the corner, e.g. "Copied 3 lines"
+	toastErr    bool
+	toastSeq    int
 
 	showHelp   bool
 	showOutput bool
@@ -143,6 +149,7 @@ func New(opts Options) Model {
 		jobs:       jobs.New(opts.Runner),
 		afterJob:   map[int]func(*Model) tea.Cmd{}, afterJobWhat: map[int]string{},
 		landed: map[string]map[string]landing{},
+		mouse:  &mouseState{},
 	}
 	m.started = m.now()
 	m.jobs.Now = m.now
@@ -450,6 +457,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyPressMsg:
+		m.sel = nil
 		if cur := m.modal; cur != nil && msg.String() != "ctrl+c" {
 			done, cmd := cur.update(&m, msg)
 			if done && m.modal == cur { // a form may have opened its confirmation
@@ -475,6 +483,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case clickMsg:
 		return m.handleClick(msg)
+
+	case selectMsg:
+		return m.onSelect(msg)
+
+	case toastExpiredMsg:
+		m.onToastExpired(msg)
+		return m, nil
 
 	case deployPreviewMsg:
 		return m, m.onDeployPreview(msg)
@@ -687,8 +702,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case copiedMsg:
-		m.onCopied(msg)
-		return m, nil
+		return m, m.onCopied(msg)
 
 	case drupalMsg:
 		st := m.state(msg.site)

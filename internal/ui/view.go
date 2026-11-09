@@ -70,10 +70,16 @@ func (m *Model) layout() (wide bool, sizes [numPanels]rect) {
 func (m Model) View() tea.View {
 	zs := &zoneList{}
 	m.zones = zs
-	v := tea.NewView(m.render())
+	frame := m.render()
+	if m.sel != nil {
+		frame = m.sel.highlight(frame)
+	}
+	v := tea.NewView(m.withToast(frame, max(m.height-2, 1)))
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeCellMotion
-	v.OnMouse = onMouse(zs.list)
+	if m.mouse != nil {
+		v.OnMouse = onMouse(zs, m.mouse, m.width, m.height)
+	}
 	v.WindowTitle = "lazyterminus"
 	if s := m.site(); s != "" {
 		v.WindowTitle = "lazyterminus · " + s
@@ -107,6 +113,9 @@ func (m Model) render() string {
 		body = mm.renderPipeline(m.width, bodyH)
 	default:
 		body = m.renderPanels()
+	}
+	if m.showHelp || m.showOutput || m.showHistory || m.showPipeline {
+		m.zones.box(0, 0, m.width, bodyH)
 	}
 	if m.modal != nil {
 		body = m.overlay(body, bodyH)
@@ -258,6 +267,7 @@ func (m *Model) rowZones(p int, r rect, n int) {
 		}
 	}
 	m.zones.add(r.x, r.y, r.w, r.h, clickTarget{kind: clickPanel, panel: p})
+	m.zones.box(r.x, r.y, r.w, r.h)
 }
 
 // detailData assembles the Detail panel for the selected environment.
@@ -441,7 +451,7 @@ func (m Model) helpLines() []string {
 		"",
 		theme.Bold.Render("Mouse"),
 		"  click selects · double or right click opens the action menu · click a key hint to press it · click a URL to open it, right-click to copy it",
-		"  "+theme.MutedText.Render("hold Shift to select and copy text"),
+		"  drag to highlight text and copy it to the clipboard "+theme.MutedText.Render("(hold Shift for the terminal's own selection)"),
 		"",
 		theme.MutedText.Render("Rebind keys in "+m.cfg.Path+" under keymap: (action name → keys)."),
 	)
@@ -481,6 +491,7 @@ func (m Model) overlay(body string, bodyH int) string {
 		}
 	}
 	m.zones.footer(footer, x, y+h-1, w)
+	m.zones.box(x, y, w, h)
 	m.zones.add(x, y, w, h, clickTarget{kind: clickNone})
 	m.zones.add(0, 0, m.width, m.height, clickTarget{kind: clickOutside})
 	return lipgloss.NewCompositor(lipgloss.NewLayer(body), lipgloss.NewLayer(box).X(x).Y(y).Z(1)).Render()
