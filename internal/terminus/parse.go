@@ -175,7 +175,33 @@ func ParseDiffstat(data []byte) ([]DiffstatEntry, error) {
 func ParseWorkflows(data []byte) ([]Workflow, error) {
 	wfs, err := rowsOnly[Workflow](data)
 	sort.SliceStable(wfs, func(i, j int) bool { return wfs[i].StartedAt > wfs[j].StartedAt })
+	markSuperseded(wfs)
 	return wfs, err
+}
+
+// markSuperseded retires workflows Pantheon left "running" after a later
+// workflow of the same kind on the same env started and finished: a second
+// code sync finishing means the first is dead (the dashboard hides it).
+// Different kinds do overlap on one env (every deploy runs an Edge sync that
+// finishes inside it), so only the same description counts. Site-level
+// workflows have no env and are left alone. wfs is newest first.
+func markSuperseded(wfs []Workflow) {
+	type kind struct{ env, workflow string }
+	finishedAfter := map[kind]bool{} // a newer workflow of this kind has finished
+	for i := range wfs {
+		env := wfs[i].EnvName()
+		if env == "" {
+			continue
+		}
+		k := kind{env, wfs[i].Workflow}
+		if wfs[i].Running() {
+			if finishedAfter[k] {
+				wfs[i].Status = StatusSuperseded
+			}
+			continue
+		}
+		finishedAfter[k] = true
+	}
 }
 
 // ParseWorkflow parses workflow:info:status output.

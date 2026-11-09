@@ -323,3 +323,54 @@ func TestCommitSubject(t *testing.T) {
 		}
 	}
 }
+
+// Pantheon can leave a workflow "running" forever (captured on riderta
+// cx-form: a code sync stuck for 42h). A later workflow on the same env that
+// started after it and finished means it is dead, as the dashboard shows it.
+func TestParseWorkflowsSupersededRunning(t *testing.T) {
+	wfs, err := ParseWorkflows([]byte(`{
+  "a": {"id": "a", "env": "cx-form", "workflow": "Sync code on \"cx-form\"", "status": "succeeded", "started_at": 1793660270.5, "finished_at": 1793660499.4},
+  "b": {"id": "b", "env": "cx-form", "workflow": "Sync code on \"cx-form\"", "status": "running", "started_at": 1793652896.8, "finished_at": null},
+  "c": {"id": "c", "env": "annual", "workflow": "Export code, files and database from \"annual\"", "status": "running", "started_at": 1793803412.3, "finished_at": null},
+  "d": {"id": "d", "env": "dev", "workflow": "Converge resource on environment", "status": "succeeded", "started_at": 1793760342.1, "finished_at": 1793760355.1},
+  "e": {"id": "e", "env": null, "workflow": "Create a Multidev environment", "status": "running", "started_at": 1793600000, "finished_at": null},
+  "f": {"id": "f", "env": null, "workflow": "Something site-level", "status": "succeeded", "started_at": 1793700000, "finished_at": 1793700010}
+}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	byID := map[string]Workflow{}
+	for _, w := range wfs {
+		byID[w.ID] = w
+	}
+	if w := byID["b"]; w.Running() || w.Status != StatusSuperseded {
+		t.Errorf("stuck sync followed by a finished one: running=%v status=%q", w.Running(), w.Status)
+	}
+	if !byID["c"].Running() {
+		t.Error("genuinely running export on another env was hidden")
+	}
+	if !byID["e"].Running() {
+		t.Error("site-level workflows have no env to serialize on; must stay running")
+	}
+}
+
+// Pantheon runs different workflows on one env side by side: every deploy
+// starts an Edge sync that finishes within a second or two while the deploy
+// keeps running for minutes (seen on riderta, one-rta, procurement). A
+// finished workflow of another kind must not retire a running one.
+func TestParseWorkflowsOverlappingKindsStayRunning(t *testing.T) {
+	wfs, err := ParseWorkflows([]byte(`{
+  "edge": {"id": "edge", "env": "test", "workflow": "Sync Advanced Edge configuration (if any) to \"test\"", "status": "succeeded", "started_at": 1793700001.0, "finished_at": 1793700002.0},
+  "deploy": {"id": "deploy", "env": "test", "workflow": "Deploy code to \"test\"", "status": "running", "started_at": 1793700000.0, "finished_at": null},
+  "converge": {"id": "converge", "env": "live", "workflow": "Converge resource on environment", "status": "succeeded", "started_at": 1793700100.0, "finished_at": 1793700110.0},
+  "backup": {"id": "backup", "env": "live", "workflow": "Automated backup for the \"live\" environment", "status": "running", "started_at": 1793700050.0, "finished_at": null}
+}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, w := range wfs {
+		if (w.ID == "deploy" || w.ID == "backup") && !w.Running() {
+			t.Errorf("%s was retired by a finished workflow of another kind (status %q)", w.Workflow, w.Status)
+		}
+	}
+}

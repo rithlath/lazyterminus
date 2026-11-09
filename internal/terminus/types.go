@@ -156,6 +156,10 @@ const (
 	StatusRunning   = "running"
 	StatusSucceeded = "succeeded"
 	StatusFailed    = "failed"
+	// StatusSuperseded is set by ParseWorkflows, never by Terminus: the
+	// workflow still reports "running" but a later one of the same kind on the
+	// same env has finished, so Pantheon lost track of it.
+	StatusSuperseded = "superseded"
 )
 
 // EnvName returns the workflow's environment or "" for site-level workflows.
@@ -168,7 +172,13 @@ func (w Workflow) EnvName() string {
 
 // Running reports whether the workflow has not finished.
 func (w Workflow) Running() bool {
-	return w.Status == StatusRunning || (w.FinishedAt == nil && w.Status != StatusFailed && w.Status != StatusSucceeded)
+	switch w.Status {
+	case StatusRunning:
+		return true
+	case StatusFailed, StatusSucceeded, StatusSuperseded:
+		return false
+	}
+	return w.FinishedAt == nil
 }
 
 // WorkflowOp is one row of `workflow:info:operations --format=json`.
