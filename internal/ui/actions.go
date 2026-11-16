@@ -141,14 +141,19 @@ func (m *Model) confirmAndRun(title, site, env string, steps [][]string, last *f
 }
 
 // final is a command run after a job's steps, outside the job queue: in
-// the background, detached so it survives quitting (drush), or with the
-// terminal (interactive palette commands).
+// the background, detached so it survives quitting (drush), with the
+// terminal (interactive palette commands), or captured and handed to then
+// (drush uli, whose link is copied).
 type final struct {
 	args     []string
 	detached bool
+	then     func(m *Model, out string) tea.Cmd
 }
 
 func (f *final) run(m *Model, actx context.Context, title, site, env string) tea.Cmd {
+	if f.then != nil {
+		return m.runCaptured(actx, title, f.args, f.then)
+	}
 	if f.detached {
 		return m.startDetached(actx, title, site, env, f.args)
 	}
@@ -337,6 +342,9 @@ func (m *Model) runAction(action string) tea.Cmd {
 				return m.confirmAndRun("drush "+cmd+" on "+se, site, e.ID, steps[:n], &final{args: steps[n], detached: true}, safety.Context{}, nil)
 			},
 		})
+
+	case ActLoginAs:
+		return m.actLoginAs(site, e.ID)
 
 	case ActCommit:
 		if e.ConnectionMode != "sftp" {

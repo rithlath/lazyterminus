@@ -233,6 +233,18 @@ what happens to each job: a Pantheon workflow keeps running, a wake step
 loses nothing but the drush after it won't start, and background drush
 keeps going.
 
+### Login links
+
+To log in as another user on an environment, for example to see what they see
+on a multidev behind SSO or to send them a link, type `login` (or `uli`) in the
+palette and choose `login-as`. It is also in the environment's `enter` menu.
+The form asks for a username (blank means user 1) and an optional path to land
+on after login, such as `webform/contact`. It runs `drush uli` on the selected
+environment and copies the link. Turn on "Open in my browser" to open it as
+well, which uses the link up. Each link works once and expires after a day.
+
+The action has no key by default; bind one with `login_as` under `keymap:`.
+
 ### Auto-wake
 
 Terminus can't report whether an environment is asleep, so before drush and
@@ -285,7 +297,8 @@ Choosing a command opens a form for its remaining arguments and options,
 built from Terminus's own definitions, and shows the full command line before
 it runs. Commands that support `--format=json` render as a table in the Output
 panel; others stream their output there. `remote:drush` and `remote:wp` run in
-the background like `x` does ([Background drush](#background-drush)); other interactive commands (`self:console`)
+the background like `x` does ([Background drush](#background-drush)). `login-as`
+is a lazyterminus action listed with the commands ([Login links](#login-links)). Other interactive commands (`self:console`)
 get your terminal, and you press Enter afterwards to return. Palette commands
 go through the same safety layer as the keys.
 

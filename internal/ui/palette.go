@@ -99,13 +99,44 @@ func (m *Model) openPalette() tea.Cmd {
 		return nil
 	}
 	scope, fill := m.paletteScope()
-	p := &paletteModal{cat: m.catalog, scope: scope, fill: fill}
+	cat := *m.catalog
+	cat.Commands = slices.Clip(cat.Commands)
+	for _, a := range paletteActions {
+		cat.Commands = append(cat.Commands, a.cmd)
+	}
+	p := &paletteModal{cat: &cat, scope: scope, fill: fill}
 	p.input = textinput.New()
 	p.input.Prompt = ": "
 	p.input.Placeholder = "search commands"
 	p.refresh()
 	m.modal = p
 	return p.input.Focus()
+}
+
+// paletteActions are lazyterminus actions listed in the palette beside the
+// Terminus commands, for ones that are easier to find by name than by key.
+// Choosing one runs the action on the selected environment.
+var paletteActions = []struct {
+	action string
+	cmd    catalog.Command
+}{
+	{ActLoginAs, catalog.Command{
+		Name:        "login-as",
+		Aliases:     []string{"login", "uli", "user:login"},
+		Description: "One-time login link for a user, copied to the clipboard (drush uli)",
+		Args:        []catalog.Arg{{Name: "site_env", Required: true}},
+	}},
+}
+
+// paletteAction returns the action a palette entry runs, or "" for a
+// Terminus command.
+func paletteAction(name string) string {
+	for _, a := range paletteActions {
+		if a.cmd.Name == name {
+			return a.action
+		}
+	}
+	return ""
 }
 
 type paletteModal struct {
@@ -150,6 +181,9 @@ func (p *paletteModal) update(m *Model, msg tea.Msg) (bool, tea.Cmd) {
 			return false, nil
 		}
 		match := p.matches[p.cursor]
+		if a := paletteAction(match.Command.Name); a != "" {
+			return true, m.runAction(a)
+		}
 		fill := ""
 		if match.Scoped {
 			fill = p.fill

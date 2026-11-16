@@ -33,6 +33,7 @@ const (
 	ActConnectionMode = "connection_mode"
 	ActWake           = "wake"
 	ActDrush          = "drush"
+	ActLoginAs        = "login_as"
 	ActCommit         = "commit"
 	ActCreateMultidev = "create_multidev"
 	ActDeleteMultidev = "delete_multidev"
@@ -75,6 +76,7 @@ var defaultBindings = []binding{
 	{ActConnectionMode, []string{"m"}, "toggle git/sftp", "Environment"},
 	{ActWake, []string{"w"}, "wake", "Environment"},
 	{ActDrush, []string{"x"}, "drush", "Environment"},
+	{ActLoginAs, nil, "log in as user (drush uli)", "Environment"},
 	{ActCommit, []string{"o"}, "commit sftp changes", "Environment"},
 	{ActCreateMultidev, []string{"n"}, "new multidev", "Environment"},
 	{ActDeleteMultidev, []string{"D"}, "delete multidev", "Environment"},
