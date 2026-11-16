@@ -527,6 +527,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.onPaletteResult(msg)
 		return m, nil
 
+	case capturedMsg:
+		return m, m.onCaptured(msg)
+
 	case execDoneMsg:
 		if msg.err != nil {
 			m.reportErr(msg.title, msg.err)
@@ -826,7 +829,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.jobs.CancelAll()
 		return m, tea.Quit
 	case ActDeploy, ActClearCache, ActBackup, ActCloneContent, ActConnectionMode, ActWake,
-		ActDrush, ActCommit, ActCreateMultidev, ActDeleteMultidev, ActUpstream:
+		ActDrush, ActLoginAs, ActCommit, ActCreateMultidev, ActDeleteMultidev, ActUpstream:
 		return m, m.runAction(action)
 	case ActOpenURL:
 		return m, m.openEnvURL()

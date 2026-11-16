@@ -799,6 +799,9 @@ func (m *MockRunner) mutate(ctx context.Context, a Args, emit func(string)) ([]b
 	m.mu.Lock()
 	if cmd == "remote:drush" || cmd == "remote:wp" {
 		defer m.mu.Unlock()
+		if link, ok := mockLoginLink(a); ok {
+			return []byte(link + "\n"), nil
+		}
 		return []byte(fmt.Sprintf("[mock] %s output for: %s\n", cmd, strings.Join(a.Positionals()[1:], " "))), nil
 	}
 	ms, env, desc, effect, err := m.plan(a, emit)
@@ -1020,4 +1023,25 @@ func (m *MockRunner) plan(a Args, emit func(string)) (ms *mockSite, env, desc st
 		}
 	}
 	return nil, "", "", func() { emit("[notice] [mock] " + Args(a).String()) }, nil
+}
+
+// mockLoginLink answers drush uli (user:login) with a one-time link.
+func mockLoginLink(a Args) (string, bool) {
+	p := a.Positionals()
+	if a.Command() != "remote:drush" || len(p) < 2 {
+		return "", false
+	}
+	switch p[1] {
+	case "uli", "user:login", "user-login":
+	default:
+		return "", false
+	}
+	site, env, _ := SplitSiteEnv(p[0])
+	link := "https://" + env + "-" + site + ".pantheonsite.io/user/reset/1/1700000000/mock-hash/login"
+	for _, s := range p[2:] {
+		if !strings.HasPrefix(s, "-") {
+			link += "?destination=" + strings.TrimPrefix(s, "/")
+		}
+	}
+	return link, true
 }

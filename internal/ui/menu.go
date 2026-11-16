@@ -67,6 +67,7 @@ func (m *Model) envMenuItems(site string, e *terminus.Env) []menuItem {
 	}
 	items = append(items,
 		item(ActDrush, "Run drush", ""),
+		item(ActLoginAs, "Log in as a user (one-time link)", ""),
 		item(ActWake, "Wake", ""),
 	)
 
@@ -142,8 +143,8 @@ func (m *Model) openEnvMenu() tea.Cmd {
 	for _, it := range menu.items {
 		if it.action == menuPalette {
 			menu.keys[it.action] = m.keys.Key(ActPalette)
-		} else {
-			menu.keys[it.action] = m.keys.Key(it.action)
+		} else if k := m.keys.Key(it.action); k != "—" { // "—": no key bound
+			menu.keys[it.action] = k
 		}
 	}
 	m.modal = menu
