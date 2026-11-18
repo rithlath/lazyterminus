@@ -191,7 +191,7 @@ func (m *Model) renderPanel(p int, r rect) string {
 		if st.envsErr != nil {
 			msg = theme.SymFailed + " " + st.envsErr.Error()
 		}
-		lines = panels.Envs(rows, &m.envList, innerW, innerH, focused, msg)
+		lines = panels.Envs(rows, &m.envList, innerW, innerH, focused, msg, m.envSpinner())
 		if n := len(st.envs); n > 0 {
 			footer = fmt.Sprintf(" %d envs ", n)
 		}

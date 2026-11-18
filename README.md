@@ -69,6 +69,7 @@ monochrome terminals lose nothing:
 | `◐` / spinner | running |
 | `✗` red, `failed` | most recent run of a workflow failed and hasn't succeeded since |
 | `○` | not loaded yet |
+| `⣾` in place of the dot | that environment's commits or uncommitted changes are loading |
 | `↑3` | test/live: 3 commits ready to deploy here. Multidevs: 3 commits ahead of dev |
 | `sftp`, `✎2 uncommitted` | on-server development, with 2 changed files |
 | `locked` | HTTP basic auth enabled |

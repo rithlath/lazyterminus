@@ -109,6 +109,7 @@ type EnvRow struct {
 	State     EnvState
 	Err       string
 	Protected bool
+	Loading   bool // a load this row's badges depend on is in flight
 }
 
 // StateSymbol returns the colored indicator and its no-color meaning.
@@ -160,8 +161,9 @@ func EnvBadges(r EnvRow) string {
 	return strings.Join(b, " ")
 }
 
-// Envs renders the Environments panel body lines.
-func Envs(rows []EnvRow, l *List, width, height int, focused bool, status string) []string {
+// Envs renders the Environments panel body lines. spin is the one-cell
+// glyph drawn in place of the state dot on rows that are still loading.
+func Envs(rows []EnvRow, l *List, width, height int, focused bool, status, spin string) []string {
 	if len(rows) == 0 {
 		return []string{theme.MutedText.Render(status)}
 	}
@@ -183,7 +185,11 @@ func Envs(rows []EnvRow, l *List, width, height int, focused bool, status string
 			continue
 		}
 		name := Fit(r.Name, nameW)
-		text := StateSymbol(r.State) + " " + name + "  " + EnvBadges(r)
+		sym := StateSymbol(r.State)
+		if r.Loading {
+			sym = spin
+		}
+		text := sym + " " + name + "  " + EnvBadges(r)
 		out = append(out, Row(text, width, i == l.Cursor, focused))
 	}
 	return out

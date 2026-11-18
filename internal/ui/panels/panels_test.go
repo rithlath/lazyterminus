@@ -33,3 +33,24 @@ func TestWorkflowsSupersededNeverFinished(t *testing.T) {
 		t.Errorf("superseded row = %q, want %s … cx-form · never finished · <ago>", stuck, theme.SymUnknown)
 	}
 }
+
+// A row whose data is still loading shows the spinner where its state dot
+// goes, without shifting the name column.
+func TestEnvsLoadingRowShowsSpinner(t *testing.T) {
+	rows := []EnvRow{
+		{Name: "dev", State: EnvOK, Ahead: -1, Changes: -1},
+		{Name: "test", State: EnvOK, Ahead: -1, Changes: -1, Loading: true},
+		{Name: "live", State: EnvOK, Ahead: -1, Changes: -1},
+	}
+	lines := Envs(rows, &List{}, 40, 5, false, "", "⣾")
+	if len(lines) != 3 {
+		t.Fatalf("lines = %d, want 3: %q", len(lines), lines)
+	}
+	loading, loaded := ansi.Strip(lines[1]), ansi.Strip(lines[2])
+	if !strings.HasPrefix(loading, "  ⣾ test") {
+		t.Errorf("loading row = %q, want the spinner before the name", loading)
+	}
+	if !strings.HasPrefix(loaded, "  "+theme.SymOK+" live") {
+		t.Errorf("loaded row = %q, want its state dot", loaded)
+	}
+}

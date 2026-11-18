@@ -258,9 +258,25 @@ func (m *Model) ahead(st *siteState, env string) (commits []terminus.Commit, tar
 	}
 }
 
+// aheadSource returns the other environment whose code log env's ahead
+// count is measured against, or "" when the count needs only its own log.
+func aheadSource(env string) string {
+	switch env {
+	case "dev":
+		return ""
+	case "test", "live":
+		return terminus.SourceEnv(env)
+	}
+	return "dev"
+}
+
 func (m *Model) envRow(site string, st *siteState, e terminus.Env) panels.EnvRow {
 	r := panels.EnvRow{Name: e.ID, Mode: e.ConnectionMode, Locked: e.Locked, Uninit: !e.Initialized,
 		Ahead: -1, Changes: -1, State: panels.EnvOK, Protected: m.protected(e.ID)}
+	r.Loading = st.inflight["codelog:"+e.ID] || st.inflight["diffstat:"+e.ID]
+	if src := aheadSource(e.ID); src != "" && st.inflight["codelog:"+src] {
+		r.Loading = true
+	}
 	if e.ID != "dev" { // dev's pending commits show on test as "ready to deploy"
 		if commits, _, _, known := m.ahead(st, e.ID); known {
 			r.Ahead = len(commits)
@@ -410,6 +426,14 @@ func (m *Model) startSpinner() tea.Cmd {
 	}
 	m.spinning = true
 	return m.spinner.Tick
+}
+
+// envSpinner is the spinner frame drawn on a loading environment row.
+func (m *Model) envSpinner() string {
+	// The spinner's own frames carry a trailing space, which would push the
+	// name column out of line with the rows showing a state dot.
+	frames := m.spinner.Spinner.Frames
+	return theme.Warn.Render(strings.TrimSpace(frames[m.pulse%len(frames)]))
 }
 
 func (m *Model) setStatus(s string, isErr bool) {
