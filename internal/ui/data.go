@@ -12,6 +12,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/rithlath/lazyterminus/internal/snapshot"
 	"github.com/rithlath/lazyterminus/internal/terminus"
 )
 
@@ -26,6 +27,11 @@ type (
 		site string
 		envs []terminus.Env
 		err  error
+	}
+	// snapshotMsg carries the lists saved by the previous run.
+	snapshotMsg struct {
+		sites []terminus.Site
+		envs  map[string][]terminus.Env
 	}
 	workflowsMsg struct {
 		site string
@@ -73,6 +79,9 @@ type siteState struct {
 	envs       []terminus.Env
 	envsErr    error
 	envsLoaded bool
+	// envsCached: envs came from the snapshot and env:list has not
+	// answered since.
+	envsCached bool
 
 	wfs      []terminus.Workflow
 	wfErr    error
@@ -112,6 +121,9 @@ func (s *siteState) begin(key string) bool {
 	return true
 }
 
+// haveEnvs reports whether envs holds a list, fresh or from the snapshot.
+func (s *siteState) haveEnvs() bool { return s.envsLoaded || s.envsCached }
+
 func (s *siteState) env(id string) *terminus.Env {
 	for i := range s.envs {
 		if s.envs[i].ID == id {
@@ -133,6 +145,38 @@ func checkAuth(c *terminus.Client) tea.Cmd {
 		defer cancel()
 		who, err := c.WhoAmI(cx)
 		return authMsg{account: who, err: err}
+	}
+}
+
+// snapshotStore is the startup snapshot kept under the cache directory.
+func snapshotStore(cacheDir string) snapshot.Store {
+	return snapshot.Store{Dir: filepath.Join(cacheDir, "snapshot")}
+}
+
+// loadSnapshot reads the lists the previous run saved. No saved site list
+// means no message: startup then waits for Terminus as before.
+func loadSnapshot(s snapshot.Store) tea.Cmd {
+	return func() tea.Msg {
+		sites, ok := s.Sites()
+		if !ok {
+			return nil
+		}
+		msg := snapshotMsg{sites: sites, envs: map[string][]terminus.Env{}}
+		for _, site := range sites {
+			if envs, ok := s.Envs(site.Name); ok {
+				msg.envs[site.Name] = envs
+			}
+		}
+		return msg
+	}
+}
+
+// saveSnapshot runs a snapshot write off the UI goroutine. A failed write
+// only costs the next startup its saved rows.
+func saveSnapshot(write func() error) tea.Cmd {
+	return func() tea.Msg {
+		_ = write()
+		return nil
 	}
 }
 

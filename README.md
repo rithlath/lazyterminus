@@ -50,7 +50,7 @@ the Detail panel can show the Drupal version and `g` can open lazygit.
 
 | Panel | Shows |
 | --- | --- |
-| **1 Sites** | name, framework, environment count |
+| **1 Sites** | name, framework, environment count (known once the site has been selected) |
 | **2 Environments** | dev, test, live, then multidevs. Each row: state symbol and badges |
 | **3 Detail** | connection mode, PHP, Drupal (from the local `composer.lock`), commits ahead of the next environment, uncommitted SFTP changes, last deploy, branch and local git status (multidevs), most recent unresolved failure and its reason |
 | **4 Workflows** | lazyterminus's own jobs, then running Pantheon workflows with a progress bar (operations done/total), then recent ones with ✓/✗ |
@@ -58,6 +58,21 @@ the Detail panel can show the Drupal version and `g` can open lazygit.
 Below 100 columns the panels stack (the focused one gets the most room); at
 100 or more, Sites and Environments sit on the left, Detail and Workflows on
 the right.
+
+### Startup
+
+`terminus env:list` makes about two requests per environment, so a site
+with many multidevs can take ten seconds or more to list. lazyterminus saves
+the site list and each environment list it receives under
+`$XDG_CACHE_HOME/lazyterminus/snapshot/` (default `~/.cache/lazyterminus/snapshot/`)
+and draws them at the next startup while Terminus fetches fresh ones. A
+panel showing saved rows says `refreshing` in its footer, or `from last run`
+if the fetch failed.
+
+Saved rows can be out of date for those first seconds: a multidev deleted
+since the last run still shows until the fresh list arrives. Only the
+selected site's environment list is fetched; another site's is fetched when
+you select it. Delete the directory to start without saved rows.
 
 Every status has a symbol or word as well as a color, so `NO_COLOR` and
 monochrome terminals lose nothing:
@@ -396,6 +411,7 @@ internal/safety/    policy, destructive list, approvals, Guard
 internal/catalog/   terminus list → palette catalog, cache, search
 internal/jobs/      background job queue
 internal/cache/     TTL cache
+internal/snapshot/  site and environment lists saved for the next startup
 internal/config/    config loading, XDG paths
 internal/ui/        root model, actions, palette, forms, modals, keymap, mouse
 internal/ui/panels/ panel renderers

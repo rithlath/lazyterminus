@@ -148,6 +148,18 @@ func (m Model) renderPanels() string {
 	return lipgloss.JoinVertical(lipgloss.Left, boxes[:]...)
 }
 
+// savedNote marks a list drawn from the startup snapshot: while Terminus
+// is fetching its replacement, or after that fetch failed.
+func savedNote(saved, loading bool) string {
+	switch {
+	case !saved:
+		return ""
+	case loading:
+		return " · refreshing"
+	}
+	return " · from last run"
+}
+
 func (m *Model) renderPanel(p int, r rect) string {
 	focused := m.focus == p
 	innerW, innerH := max(r.w-4, 1), max(r.h-2, 0)
@@ -162,8 +174,13 @@ func (m *Model) renderPanel(p int, r rect) string {
 		rows := make([]panels.SiteRow, len(m.sites))
 		for i, s := range m.sites {
 			row := panels.SiteRow{Name: s.Name, Framework: s.Framework, EnvCount: -1}
-			if ss, ok := m.data[s.Name]; ok && ss.envsLoaded {
-				row.EnvCount, row.Err = len(ss.envs), ss.envsErr != nil
+			if ss, ok := m.data[s.Name]; ok {
+				row.Loading = ss.inflight["envs"]
+				if ss.haveEnvs() {
+					row.EnvCount = len(ss.envs)
+				}
+				// A saved list stays usable when its refresh fails.
+				row.Err = ss.envsErr != nil && !ss.envsCached
 			}
 			rows[i] = row
 		}
@@ -176,7 +193,7 @@ func (m *Model) renderPanel(p int, r rect) string {
 		}
 		lines = panels.Sites(rows, &m.siteList, innerW, innerH, focused, msg)
 		if len(m.sites) > 0 {
-			footer = fmt.Sprintf(" %d of %d ", m.siteList.Cursor+1, len(m.sites))
+			footer = fmt.Sprintf(" %d of %d%s ", m.siteList.Cursor+1, len(m.sites), savedNote(m.sitesCached, !m.sitesLoaded))
 		}
 	case panelEnvs:
 		if site != "" {
@@ -193,7 +210,7 @@ func (m *Model) renderPanel(p int, r rect) string {
 		}
 		lines = panels.Envs(rows, &m.envList, innerW, innerH, focused, msg, m.envSpinner())
 		if n := len(st.envs); n > 0 {
-			footer = fmt.Sprintf(" %d envs ", n)
+			footer = fmt.Sprintf(" %d envs%s ", n, savedNote(st.envsCached, st.inflight["envs"]))
 		}
 	case panelDetail:
 		d := m.detailData()

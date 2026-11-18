@@ -48,7 +48,8 @@ func Framework(f string) string {
 type SiteRow struct {
 	Name      string
 	Framework string
-	EnvCount  int // -1 while loading
+	EnvCount  int // -1 when unknown
+	Loading   bool
 	Err       bool
 }
 
@@ -69,12 +70,14 @@ func Sites(rows []SiteRow, l *List, width, height int, focused bool, status stri
 	out := make([]string, 0, end-start)
 	for i := start; i < end; i++ {
 		r := rows[i]
-		count := theme.MutedText.Render("…")
+		count := ""
 		switch {
 		case r.Err:
 			count = theme.Fail.Render(theme.SymFailed + " error")
 		case r.EnvCount >= 0:
 			count = theme.MutedText.Render(fmt.Sprintf("%d envs", r.EnvCount))
+		case r.Loading:
+			count = theme.MutedText.Render("…")
 		}
 		text := fmt.Sprintf("%-*s  %s  %s", nameW, r.Name, theme.MutedText.Render(fmt.Sprintf("%-7s", Framework(r.Framework))), count)
 		out = append(out, Row(text, width, i == l.Cursor, focused))
