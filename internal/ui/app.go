@@ -280,6 +280,9 @@ func (m *Model) envRow(site string, st *siteState, e terminus.Env) panels.EnvRow
 	if e.ID != "dev" { // dev's pending commits show on test as "ready to deploy"
 		if commits, _, _, known := m.ahead(st, e.ID); known {
 			r.Ahead = len(commits)
+		} else {
+			// Multidev logs load on selection, so an unvisited one stays here.
+			r.State = panels.EnvUnknown
 		}
 	}
 	if err := st.codeLogErr[e.ID]; err != nil {
@@ -361,6 +364,11 @@ func (m *Model) ensureSite(site string, force bool) tea.Cmd {
 
 // ensureEnvData loads code logs (for deploy/ahead counts) and diffstats
 // (for SFTP environments) once a site's env list is known.
+//
+// A multidev's code log costs one Terminus call, so it loads only when
+// something shows it: the multidev is selected, or the pipeline is open
+// (it draws every multidev). A forced reload also refreshes the logs
+// already loaded, so visited rows don't go stale.
 func (m *Model) ensureEnvData(site string, force bool) tea.Cmd {
 	st := m.state(site)
 	var cmds []tea.Cmd
@@ -372,8 +380,14 @@ func (m *Model) ensureEnvData(site string, force bool) tea.Cmd {
 	need("dev")
 	need("test")
 	need("live") // current commit on live, for the pipeline view
+	current := site == m.site()
+	selected := ""
+	if current {
+		selected = m.selectedEnv()
+	}
 	for _, e := range st.envs {
-		if e.IsMultidev() {
+		if _, loaded := st.codeLogs[e.ID]; e.IsMultidev() &&
+			(e.ID == selected || (current && m.showPipeline) || (force && loaded)) {
 			need(e.ID)
 		}
 		if e.ConnectionMode == "sftp" {
@@ -381,6 +395,17 @@ func (m *Model) ensureEnvData(site string, force bool) tea.Cmd {
 				cmds = append(cmds, loadDiffstat(m.client, site, e.ID, force))
 			}
 		}
+	}
+	return tea.Batch(cmds...)
+}
+
+// ensureSelected starts the loads the selected environment needs. Call it
+// whenever the selection moves or the env list changes.
+func (m *Model) ensureSelected() tea.Cmd {
+	site := m.site()
+	cmds := []tea.Cmd{m.ensureOps(site), m.ensureBranch(), m.ensureDomains(), m.startSpinner()}
+	if m.state(site).envsLoaded {
+		cmds = append(cmds, m.ensureEnvData(site, false))
 	}
 	return tea.Batch(cmds...)
 }
@@ -664,7 +689,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.restoreEnvCursor(prevEnv)
-		return m, tea.Batch(m.ensureEnvData(msg.site, false), m.ensureOps(msg.site), m.ensureBranch(), m.ensureDomains())
+		return m, m.ensureSelected()
 
 	case workflowsMsg:
 		st := m.state(msg.site)
@@ -870,7 +895,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if m.showPipeline && m.selectedEnv() == "" {
 			return m, tea.Batch(m.selectEnv("dev"), m.startAnim())
 		}
-		return m, m.startAnim()
+		return m, tea.Batch(m.ensureSelected(), m.startAnim())
 	case ActNextPanel:
 		m.focus = (m.focus + 1) % numPanels
 	case ActPrevPanel:
@@ -916,7 +941,7 @@ func (m Model) move(delta int) (tea.Model, tea.Cmd) {
 		rows := m.envRows()
 		m.envList.Move(selectable(rows), delta)
 		m.detailOffset = 0
-		return m, tea.Batch(m.ensureOps(m.site()), m.ensureBranch(), m.ensureDomains())
+		return m, m.ensureSelected()
 	case panelDetail:
 		m.detailOffset = max(m.detailOffset+delta, 0)
 	case panelWorkflows:

@@ -61,9 +61,10 @@ func TestPipelineNarrowLayout(t *testing.T) {
 
 func TestPipelineNeverOverflows(t *testing.T) {
 	h := start(t, Options{Site: "acme-web", Env: "acme-web.test"}, 140, 40)
-	h.waitText("sftp ↑1 ✎2")
+	h.waitText("sftp ✎2")
+	h.keys("p") // opening the pipeline loads the multidev logs it draws
+	h.waitText("↑ 11 ahead")
 	m := h.final()
-	m.showPipeline = true
 	for _, filter := range []string{"", "proj", "a-very-long-multidev-filter", "zzz"} {
 		for _, sz := range [][2]int{{30, 8}, {60, 20}, {80, 24}, {99, 30}, {100, 30}, {140, 40}, {220, 60}} {
 			mm := m

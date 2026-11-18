@@ -68,9 +68,9 @@ monochrome terminals lose nothing:
 | `●` amber | needs attention: commits waiting, uncommitted SFTP changes |
 | `◐` / spinner | running |
 | `✗` red, `failed` | most recent run of a workflow failed and hasn't succeeded since |
-| `○` | not loaded yet |
+| `○` | not loaded yet. A multidev's commits load when you select it or open the pipeline |
 | `⣾` in place of the dot | that environment's commits or uncommitted changes are loading |
-| `↑3` | test/live: 3 commits ready to deploy here. Multidevs: 3 commits ahead of dev |
+| `↑3` | test/live: 3 commits ready to deploy here. Multidevs: 3 commits ahead of dev, shown once its commits have loaded |
 | `sftp`, `✎2 uncommitted` | on-server development, with 2 changed files |
 | `locked` | HTTP basic auth enabled |
 

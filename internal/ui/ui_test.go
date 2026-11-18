@@ -212,7 +212,7 @@ func TestEnvFlagFocusesEnvironment(t *testing.T) {
 func TestEnvBadgesAndFailure(t *testing.T) {
 	h := start(t, Options{Site: "acme-web", Env: "acme-web.test"}, 130, 40)
 	h.waitText("Bring application container to desired configuration state")
-	for _, want := range []string{"test        git ↑2 failed", "live        git ↑1", "sftp ↑1 ✎2 uncommitted", "── multidevs"} {
+	for _, want := range []string{"test        git ↑2 failed", "live        git ↑1", "sftp ✎2 uncommitted", "── multidevs"} {
 		h.waitText(want)
 	}
 }
@@ -251,7 +251,7 @@ func TestErrorsShowInStatusAndOutput(t *testing.T) {
 func TestRenderNeverOverflows(t *testing.T) {
 	h := start(t, Options{Site: "acme-web", Env: "acme-web.test"}, 130, 36)
 	h.waitText("Bring application container")
-	h.waitText("sftp ↑1 ✎2")
+	h.waitText("sftp ✎2")
 	m := h.final()
 	for _, sz := range [][2]int{{40, 12}, {60, 20}, {80, 24}, {99, 30}, {100, 30}, {120, 40}, {200, 60}, {30, 8}} {
 		for focus := range numPanels {
