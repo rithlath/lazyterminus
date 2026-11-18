@@ -48,7 +48,8 @@ func Framework(f string) string {
 type SiteRow struct {
 	Name      string
 	Framework string
-	EnvCount  int // -1 while loading
+	EnvCount  int // -1 when unknown
+	Loading   bool
 	Err       bool
 }
 
@@ -69,12 +70,14 @@ func Sites(rows []SiteRow, l *List, width, height int, focused bool, status stri
 	out := make([]string, 0, end-start)
 	for i := start; i < end; i++ {
 		r := rows[i]
-		count := theme.MutedText.Render("…")
+		count := ""
 		switch {
 		case r.Err:
 			count = theme.Fail.Render(theme.SymFailed + " error")
 		case r.EnvCount >= 0:
 			count = theme.MutedText.Render(fmt.Sprintf("%d envs", r.EnvCount))
+		case r.Loading:
+			count = theme.MutedText.Render("…")
 		}
 		text := fmt.Sprintf("%-*s  %s  %s", nameW, r.Name, theme.MutedText.Render(fmt.Sprintf("%-7s", Framework(r.Framework))), count)
 		out = append(out, Row(text, width, i == l.Cursor, focused))
@@ -109,6 +112,7 @@ type EnvRow struct {
 	State     EnvState
 	Err       string
 	Protected bool
+	Loading   bool // a load this row's badges depend on is in flight
 }
 
 // StateSymbol returns the colored indicator and its no-color meaning.
@@ -160,8 +164,9 @@ func EnvBadges(r EnvRow) string {
 	return strings.Join(b, " ")
 }
 
-// Envs renders the Environments panel body lines.
-func Envs(rows []EnvRow, l *List, width, height int, focused bool, status string) []string {
+// Envs renders the Environments panel body lines. spin is the one-cell
+// glyph drawn in place of the state dot on rows that are still loading.
+func Envs(rows []EnvRow, l *List, width, height int, focused bool, status, spin string) []string {
 	if len(rows) == 0 {
 		return []string{theme.MutedText.Render(status)}
 	}
@@ -183,7 +188,11 @@ func Envs(rows []EnvRow, l *List, width, height int, focused bool, status string
 			continue
 		}
 		name := Fit(r.Name, nameW)
-		text := StateSymbol(r.State) + " " + name + "  " + EnvBadges(r)
+		sym := StateSymbol(r.State)
+		if r.Loading {
+			sym = spin
+		}
+		text := sym + " " + name + "  " + EnvBadges(r)
 		out = append(out, Row(text, width, i == l.Cursor, focused))
 	}
 	return out

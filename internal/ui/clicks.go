@@ -241,7 +241,7 @@ func (m *Model) selectRow(p, i int) tea.Cmd {
 	case panelEnvs:
 		m.envList.Cursor = i
 		m.detailOffset = 0
-		return tea.Batch(m.ensureOps(m.site()), m.ensureBranch(), m.ensureDomains())
+		return m.ensureSelected()
 	case panelWorkflows:
 		m.wfList.Cursor = i
 	}

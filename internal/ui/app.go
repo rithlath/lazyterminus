@@ -16,6 +16,7 @@ import (
 	"github.com/rithlath/lazyterminus/internal/config"
 	"github.com/rithlath/lazyterminus/internal/jobs"
 	"github.com/rithlath/lazyterminus/internal/runs"
+	"github.com/rithlath/lazyterminus/internal/snapshot"
 	"github.com/rithlath/lazyterminus/internal/terminus"
 	"github.com/rithlath/lazyterminus/internal/ui/panels"
 	"github.com/rithlath/lazyterminus/internal/ui/theme"
@@ -33,7 +34,8 @@ type Options struct {
 	DryRun   bool
 	// Now overrides the clock (tests).
 	Now func() time.Time
-	// CatalogDir overrides where the command catalog is cached (tests).
+	// CatalogDir overrides the cache directory, which holds the command
+	// catalog and the startup snapshot (tests).
 	CatalogDir string
 	// OpenURL overrides opening a URL in the browser (tests).
 	OpenURL func(url string) error
@@ -76,7 +78,13 @@ type Model struct {
 	sites       []terminus.Site
 	sitesErr    error
 	sitesLoaded bool
-	data        map[string]*siteState
+	// sitesCached: sites came from the startup snapshot and site:list has
+	// not answered since.
+	sitesCached bool
+	// siteFlagApplied: --site has been honored, so later site lists keep
+	// the user's selection.
+	siteFlagApplied bool
+	data            map[string]*siteState
 
 	siteList, envList, wfList panels.List
 	detailOffset              int
@@ -182,8 +190,27 @@ func (m *Model) now() time.Time {
 // Init implements tea.Model.
 func (m Model) Init() tea.Cmd {
 	// The catalog loads in the background at startup so ":" opens instantly.
-	return tea.Batch(checkAuth(m.client), loadSites(m.client, false), m.spinner.Tick, clockTick(),
+	return tea.Batch(loadSnapshot(m.snapshots()), checkAuth(m.client), loadSites(m.client, false), m.spinner.Tick, clockTick(),
 		loadCatalog(m.opts.Runner, m.catalogDir(), false), loadLocalLog(m.opts.HistoryLog), loadRuns(m.opts.RunsDir))
+}
+
+// snapshots is the store for the lists drawn at the next startup.
+func (m *Model) snapshots() snapshot.Store { return snapshotStore(m.catalogDir()) }
+
+// allowedSites drops sites the config's allowlist excludes.
+func (m *Model) allowedSites(all []terminus.Site) []terminus.Site {
+	var sites []terminus.Site
+	for _, s := range all {
+		if m.cfg.Allowed(s.Name) {
+			sites = append(sites, s)
+		}
+	}
+	return sites
+}
+
+// siteIndex returns the position of the site called name, or -1.
+func siteIndex(sites []terminus.Site, name string) int {
+	return slices.IndexFunc(sites, func(s terminus.Site) bool { return s.Name == name })
 }
 
 // ---- selection helpers ----------------------------------------------------
@@ -258,12 +285,31 @@ func (m *Model) ahead(st *siteState, env string) (commits []terminus.Commit, tar
 	}
 }
 
+// aheadSource returns the other environment whose code log env's ahead
+// count is measured against, or "" when the count needs only its own log.
+func aheadSource(env string) string {
+	switch env {
+	case "dev":
+		return ""
+	case "test", "live":
+		return terminus.SourceEnv(env)
+	}
+	return "dev"
+}
+
 func (m *Model) envRow(site string, st *siteState, e terminus.Env) panels.EnvRow {
 	r := panels.EnvRow{Name: e.ID, Mode: e.ConnectionMode, Locked: e.Locked, Uninit: !e.Initialized,
 		Ahead: -1, Changes: -1, State: panels.EnvOK, Protected: m.protected(e.ID)}
+	r.Loading = st.inflight["codelog:"+e.ID] || st.inflight["diffstat:"+e.ID]
+	if src := aheadSource(e.ID); src != "" && st.inflight["codelog:"+src] {
+		r.Loading = true
+	}
 	if e.ID != "dev" { // dev's pending commits show on test as "ready to deploy"
 		if commits, _, _, known := m.ahead(st, e.ID); known {
 			r.Ahead = len(commits)
+		} else {
+			// Multidev logs load on selection, so an unvisited one stays here.
+			r.State = panels.EnvUnknown
 		}
 	}
 	if err := st.codeLogErr[e.ID]; err != nil {
@@ -337,7 +383,7 @@ func (m *Model) ensureSite(site string, force bool) tea.Cmd {
 	if !st.drupalLoaded && st.begin("drupal") {
 		cmds = append(cmds, loadDrupal(site, m.cfg.RepoFor(site)))
 	}
-	if st.envsLoaded {
+	if st.haveEnvs() {
 		cmds = append(cmds, m.ensureEnvData(site, force))
 	}
 	return tea.Batch(cmds...)
@@ -345,6 +391,11 @@ func (m *Model) ensureSite(site string, force bool) tea.Cmd {
 
 // ensureEnvData loads code logs (for deploy/ahead counts) and diffstats
 // (for SFTP environments) once a site's env list is known.
+//
+// A multidev's code log costs one Terminus call, so it loads only when
+// something shows it: the multidev is selected, or the pipeline is open
+// (it draws every multidev). A forced reload also refreshes the logs
+// already loaded, so visited rows don't go stale.
 func (m *Model) ensureEnvData(site string, force bool) tea.Cmd {
 	st := m.state(site)
 	var cmds []tea.Cmd
@@ -356,8 +407,14 @@ func (m *Model) ensureEnvData(site string, force bool) tea.Cmd {
 	need("dev")
 	need("test")
 	need("live") // current commit on live, for the pipeline view
+	current := site == m.site()
+	selected := ""
+	if current {
+		selected = m.selectedEnv()
+	}
 	for _, e := range st.envs {
-		if e.IsMultidev() {
+		if _, loaded := st.codeLogs[e.ID]; e.IsMultidev() &&
+			(e.ID == selected || (current && m.showPipeline) || (force && loaded)) {
 			need(e.ID)
 		}
 		if e.ConnectionMode == "sftp" {
@@ -365,6 +422,17 @@ func (m *Model) ensureEnvData(site string, force bool) tea.Cmd {
 				cmds = append(cmds, loadDiffstat(m.client, site, e.ID, force))
 			}
 		}
+	}
+	return tea.Batch(cmds...)
+}
+
+// ensureSelected starts the loads the selected environment needs. Call it
+// whenever the selection moves or the env list changes.
+func (m *Model) ensureSelected() tea.Cmd {
+	site := m.site()
+	cmds := []tea.Cmd{m.ensureOps(site), m.ensureBranch(), m.ensureDomains(), m.startSpinner()}
+	if m.state(site).haveEnvs() {
+		cmds = append(cmds, m.ensureEnvData(site, false))
 	}
 	return tea.Batch(cmds...)
 }
@@ -410,6 +478,14 @@ func (m *Model) startSpinner() tea.Cmd {
 	}
 	m.spinning = true
 	return m.spinner.Tick
+}
+
+// envSpinner is the spinner frame drawn on a loading environment row.
+func (m *Model) envSpinner() string {
+	// The spinner's own frames carry a trailing space, which would push the
+	// name column out of line with the rows showing a state dot.
+	frames := m.spinner.Spinner.Frames
+	return theme.Warn.Render(strings.TrimSpace(frames[m.pulse%len(frames)]))
 }
 
 func (m *Model) setStatus(s string, isErr bool) {
@@ -574,6 +650,34 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.onRunsLoaded(msg)
 		return m, tea.Batch(m.startSpinner(), m.startAnim())
 
+	case snapshotMsg:
+		if m.sitesLoaded || len(m.sites) > 0 {
+			return m, nil // Terminus answered first
+		}
+		sites := m.allowedSites(msg.sites)
+		if len(sites) == 0 {
+			return m, nil
+		}
+		m.sites, m.sitesCached = sites, true
+		for site, envs := range msg.envs {
+			if st := m.state(site); !st.envsLoaded {
+				st.envs, st.envsCached = envs, true
+			}
+		}
+		idx := 0
+		if i := siteIndex(sites, m.opts.Site); i >= 0 {
+			idx, m.siteFlagApplied = i, true
+		}
+		m.pollSeq = 0
+		cmd := m.selectSite(idx)
+		// --env belongs to the --site it was given with; if the snapshot
+		// doesn't have that site, leave it for the fresh list.
+		if m.pendingEnv != "" && (m.opts.Site == "" || m.siteFlagApplied) && m.state(m.site()).env(m.pendingEnv) != nil {
+			m.restoreEnvCursor("")
+			cmd = tea.Batch(cmd, m.ensureSelected())
+		}
+		return m, cmd
+
 	case sitesLoadedMsg:
 		first := !m.sitesLoaded
 		m.sitesLoaded = true
@@ -582,44 +686,36 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.reportErr("site:list", msg.err)
 			return m, nil
 		}
-		m.sitesErr = nil
-		var sites []terminus.Site
-		for _, s := range msg.sites {
-			if m.cfg.Allowed(s.Name) {
-				sites = append(sites, s)
-			}
-		}
+		m.sitesErr, m.sitesCached = nil, false
+		store := m.snapshots()
+		save := saveSnapshot(func() error { return store.SaveSites(msg.sites) })
+		sites := m.allowedSites(msg.sites)
 		prev := m.site()
 		m.sites = sites
 		if len(sites) == 0 {
 			m.setStatus("No sites found (check the sites allowlist in "+m.cfg.Path+")", true)
-			return m, nil
+			return m, save
 		}
 		if !first || m.status == "" || m.status == loadingSites { // at startup, keep a notice already showing (runs that ended while closed)
 			m.setStatus(fmt.Sprintf("%d sites", len(sites)), false)
 		}
-		want := prev
-		if want == "" {
-			want = m.opts.Site
-		}
-		idx := 0
-		for i, s := range sites {
-			if s.Name == want {
+		idx := siteIndex(sites, prev)
+		if flag := m.opts.Site; flag != "" && !m.siteFlagApplied {
+			if i := siteIndex(sites, flag); i >= 0 {
 				idx = i
+			} else {
+				m.reportErr("--site", fmt.Errorf("site %q not found", flag))
 			}
 		}
-		if m.opts.Site != "" && prev == "" && sites[idx].Name != m.opts.Site {
-			m.reportErr("--site", fmt.Errorf("site %q not found", m.opts.Site))
+		m.siteFlagApplied = true
+		if idx >= 0 && sites[idx].Name == prev {
+			// Same site as before the list arrived (the snapshot, or a
+			// refresh): keep the environment selection and the polling.
+			m.siteList.Cursor = idx
+			return m, save
 		}
 		m.pollSeq = 0
-		cmds := []tea.Cmd{m.selectSite(idx)}
-		// Load env lists for every site so the Sites panel can show counts.
-		for _, s := range sites {
-			if st := m.state(s.Name); !st.envsLoaded && st.begin("envs") {
-				cmds = append(cmds, loadEnvs(m.client, s.Name, false))
-			}
-		}
-		return m, tea.Batch(cmds...)
+		return m, tea.Batch(m.selectSite(max(idx, 0)), save)
 
 	case envsLoadedMsg:
 		st := m.state(msg.site)
@@ -630,17 +726,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.reportErr("env:list "+msg.site, msg.err)
 			return m, nil
 		}
-		st.envsErr = nil
+		st.envsErr, st.envsCached = nil, false
 		prevEnv := ""
 		if msg.site == m.site() {
 			prevEnv = m.selectedEnv()
 		}
 		st.envs = msg.envs
+		store := m.snapshots()
+		save := saveSnapshot(func() error { return store.SaveEnvs(msg.site, msg.envs) })
 		if msg.site != m.site() {
-			return m, nil
+			return m, save
 		}
 		m.restoreEnvCursor(prevEnv)
-		return m, tea.Batch(m.ensureEnvData(msg.site, false), m.ensureOps(msg.site), m.ensureBranch(), m.ensureDomains())
+		return m, tea.Batch(m.ensureSelected(), save)
 
 	case workflowsMsg:
 		st := m.state(msg.site)
@@ -846,7 +944,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if m.showPipeline && m.selectedEnv() == "" {
 			return m, tea.Batch(m.selectEnv("dev"), m.startAnim())
 		}
-		return m, m.startAnim()
+		return m, tea.Batch(m.ensureSelected(), m.startAnim())
 	case ActNextPanel:
 		m.focus = (m.focus + 1) % numPanels
 	case ActPrevPanel:
@@ -892,7 +990,7 @@ func (m Model) move(delta int) (tea.Model, tea.Cmd) {
 		rows := m.envRows()
 		m.envList.Move(selectable(rows), delta)
 		m.detailOffset = 0
-		return m, tea.Batch(m.ensureOps(m.site()), m.ensureBranch(), m.ensureDomains())
+		return m, m.ensureSelected()
 	case panelDetail:
 		m.detailOffset = max(m.detailOffset+delta, 0)
 	case panelWorkflows:
